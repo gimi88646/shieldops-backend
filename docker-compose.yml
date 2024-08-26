@@ -1,0 +1,77 @@
+services:
+  logstash:
+    container_name: logstash
+    image: logstash:7.10.1
+    restart: always
+    ports:
+      - 8181:8181
+    environment:
+      - LOGSTASH_PORT=8181
+      - ELASTIC_HOST=http://192.168.1.103:9200
+      
+    volumes:
+      - type: bind
+        source: ./logstash/pipeline
+        target: /usr/share/logstash/pipeline/
+        
+      - type: bind
+        source: logstash/logstash.yml
+        target: /usr/share/logstash/config/logstash.yml
+      
+  rabbit:
+    container_name: rabbit
+    image: rabbitmq:3.13.3-alpine
+    restart: always
+  
+  django:
+    container_name: django-app
+    build: 
+      context: ./ShieldOps-Backend
+    command: python manage.py runserver 0.0.0.0:8080
+    volumes:
+      - ./ShieldOps-Backend:/usr/src/app
+    ports:
+      - 8085:8080
+    restart: always
+    environment:
+      - MONGO_URL=mongodb://192.168.1.101:27017
+      - SPLUNK_HOST=192.168.1.102:8086
+      - SPLUNK_API_KEY=Splunk af0bd3f1-4cb9-408c-86b7-be72e308aa8d
+      - ELASTIC_API_KEY=MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw==
+      - ELASTIC_HOST=http://192.168.1.103:9200
+      - CELERY_BROKER=amqp://guest:guest@rabbit:5672/
+      - DEBUG=1
+      # - ALLOWED_HOSTS=localhost,127.0.0.1
+      - ALLOWED_HOSTS=*
+      - SECRET_KEY=asdf
+    depends_on:
+      - rabbit
+      - logstash
+  
+  celery:
+    deploy:
+      mode: replicated
+      replicas: 1
+    command: celery --app=mitrerules worker -l INFO -B
+    build: 
+      context: ./ShieldOps-Backend
+
+    volumes:
+      - ./ShieldOps-Backend:/usr/src/app
+    restart: always
+    environment:
+      - SPLUNK_HOST=192.168.1.102:8086
+      - SPLUNK_API_KEY=Splunk af0bd3f1-4cb9-408c-86b7-be72e308aa8d
+      - ELASTIC_API_KEY=MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw==
+      - ELASTIC_HOST=http://192.168.1.103:9200
+      - CELERY_BROKER=amqp://guest:guest@rabbit:5672/
+      - DEBUG=1
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - SECRET_KEY=asdf
+      - LOGSTASH_HOST=http://logstash:8181
+    depends_on:
+      - rabbit
+      - logstash
+
+volumes:
+  pipeline:
