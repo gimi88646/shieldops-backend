@@ -121,6 +121,9 @@ def login(request):
             {
                 '$group': {
                     '_id': '$_id',
+                    'firstname': {'$first':"$firstname"},
+                    'lastname':{'$first':"$lastname"},
+                    'email':{'$first':"$email"},
                     'password': {'$first': "$password"},
                     'roles': {
                         '$push': '$roles.name'
@@ -137,6 +140,9 @@ def login(request):
             token = AccessToken()
             token['user_id'] = str(user['_id'])
             token['roles'] = user['roles']
+            token['firstname']=user['firstname']
+            token['lastname']=user['lastname']
+            token['email']=user['email']
             return JsonResponse({'access': str(token)}, status=200)
 
         # If credentials are invalid, return an error response
@@ -203,12 +209,6 @@ def login(request):
     #         # token['role'] = user['role']
     #         return JsonResponse({'access': str(token)}, status=200)
     # return JsonResponse({'error': 'Invalid credentials'}, status=401)
-
-# from rest_framework.decorators import api_view
-# from rest_framework_simplejwt.tokens import AccessToken
-# from rest_framework.response import Response
-# from rest_framework import status
-
 
 @roles_required(["user"])
 def test_auth(request):
