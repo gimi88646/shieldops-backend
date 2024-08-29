@@ -1,4 +1,5 @@
 from db_connection import incidents_collection
+from .sequences import get_next_incident_seq
 from .forms import IncidentForm,IncidentCommentForm
 from django.views.decorators.csrf import csrf_exempt
 from ..utils.role_required import roles_required
@@ -21,11 +22,17 @@ def post_incident(request):
             incident_type = incident["incident_type"]
             if not isinstance(incident_type,list):
                 return JsonResponse({'status': 'error', 'message': 'incident type must be of type list of strings'}, status=500)
+            
+            customer_code = cleaned_data["customer_code"]
+            # generate sequence for incident id
+            seq = get_next_incident_seq(customer_code)
+            incident_id =  str(customer_code)+"-"+str(seq) 
+            cleaned_data["_id"] = incident_id
+            
             cleaned_data["incident_type"] = incident_type
             result = incidents_collection.insert_one(cleaned_data)
             if not result:
                 return JsonResponse({'status': 'error', 'message': 'failed to save.'}, status=500)
-            # incident_dto = {}
             cleaned_data["incident_id"] = str(cleaned_data["_id"])
             del cleaned_data["_id"]
 
@@ -68,7 +75,7 @@ def add_comment_to_incident(request,incident_id):
         form = IncidentCommentForm(remarks)
         if form.is_valid():        
             cleaned_data = form.cleaned_data
-            print(cleaned_data)
+            # print(cleaned_data)
             cleaned_data["commented_by"] = ObjectId(request.user)
             
             incidents_collection.update_one(

@@ -37,6 +37,13 @@ class UserRoleForm(forms.Form):
         validators=[validate_object_id],
         help_text="Invalid id for role"
     )
+class CustomerFrom(forms.Form):
+    customer_name  = forms.CharField()
+    postal_address = forms.CharField()
+    email = forms.EmailField()
+    phone_number = forms.CharField()
+    website = forms.URLField()
+
 class IncidentCommentForm(forms.Form):
      remarks =  forms.CharField()
 
@@ -45,6 +52,7 @@ class UserLoginForm(forms.Form):
     password = forms.CharField(required=True,min_length=8)
 
 class IncidentForm(forms.Form):
+    customer_code = forms.IntegerField(min_value=1000,max_value=9999)
     incident_disposition = forms.CharField(max_length=500)
     executive_involved = forms.CharField(max_length=100)
     name = forms.CharField(max_length=100)
