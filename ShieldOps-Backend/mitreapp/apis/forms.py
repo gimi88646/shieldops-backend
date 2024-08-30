@@ -53,26 +53,28 @@ class UserLoginForm(forms.Form):
 
 class IncidentForm(forms.Form):
     customer_code = forms.IntegerField(min_value=1000,max_value=9999)
-    incident_disposition = forms.CharField(max_length=500)
-    executive_involved = forms.CharField(max_length=100)
-    name = forms.CharField(max_length=100)
-
+    # name = forms.CharField(max_length=100)
+    incident_id = forms.CharField()
+    description = forms.CharField()
+    artifact = forms.CharField()
+    # incident_disposition = forms.CharField(max_length=500)
+    # executive_involved = forms.CharField(max_length=100)
     # Date and location
-    date_occured = forms.DateTimeField()
-    date_discovered = forms.DateTimeField()
-    html_block = forms.CharField()
+    # date_occured = forms.DateTimeField()
+    # date_discovered = forms.DateTimeField()
+    # html_block = forms.CharField()
 
     # Implications
-    criminal_status_view = forms.CharField()
-    employee_involvement_view = forms.CharField()
-    department = forms.CharField()
-    negative_pr = forms.CharField()
-    reporting_individual = forms.CharField()
-    severity = forms.CharField()
+    # criminal_status_view = forms.CharField()
+    # employee_involvement_view = forms.CharField()
+    # department = forms.CharField()
+    # negative_pr = forms.CharField()
+    # reporting_individual = forms.CharField()
+    # severity = forms.CharField()
 
     #privacy
-    pii_fields_view = forms.CharField()
+    # pii_fields_view = forms.CharField()
 
-    #team formation
-    owner = forms.CharField()
-    membership_chooser = forms.CharField()
+    # team formation
+    # owner = forms.CharField()
+    # membership_chooser = forms.CharField()

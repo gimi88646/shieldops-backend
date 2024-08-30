@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY",'django-insecure-k2&h2fzs1__nb*dq(8=#i&#=g6o&jgzqx9u7homx+f1z%o7(&u')
 # ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS").split(",")
 ALLOWED_HOSTS = ["*"]
-
+APPEND_SLASH = False
 # DEBUG=os.environ.get("DEBUG")
 DEBUG=True
 ELASTIC_API_KEY= os.environ.get("ELASTIC_API_KEY")

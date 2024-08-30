@@ -5,10 +5,10 @@ import json
 from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+
 @csrf_exempt
 def addCustomer(request):
     """add customer to the database, also initialize its incident counter"""
-
     try:
         if request.method != 'POST':
             return JsonResponse({'status': 'error', 'message': 'method not allowed.'}, status=405)
@@ -47,3 +47,13 @@ def addCustomer(request):
 
 # with client.start_session(causal_consistency=True) as session:
                 # pass
+
+def get_all_customers(request):
+    # this api fetches all the customers from db 
+    try:
+        customers = list(customers_collection.find())
+        for customer in customers:
+            customer['_id']=str(customer['_id'])
+        return JsonResponse(customers, safe=False)
+    except:
+        pass

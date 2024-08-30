@@ -17,7 +17,7 @@ from pymongo.errors import PyMongoError
 
 
 @csrf_exempt
-# @roles_required(["admin"])
+@roles_required(["admin"])
 def addUser(request):
     body = request.body 
     body_str = body.decode('utf-8')  
@@ -63,6 +63,15 @@ def addUser(request):
                     }
                     user_roles.append(user_role)
                 user_roles_collection.insert_many(user_roles)
+            else:
+                # find role id for default role which user from  default role collection
+                default_role = roles_collection.find_one({"name":"user"})
+                user_role = {
+                        "user_id":result.inserted_id,
+                        "role_id":default_role["_id"]
+                    }
+                user_roles_collection.insert_one(user_role)
+
             user_dto = {
                 "user_id":str(cleaned_data["_id"]),
                 "firstname": cleaned_data["firstname"],
@@ -89,7 +98,6 @@ def login(request):
         data = json.loads(body)
         email = data.get('email')
         password = data.get('password')
-
         pipeline = [
             {
                 '$match': {
@@ -133,9 +141,9 @@ def login(request):
         ]
 
         # Execute the aggregation pipeline
+        print("finding user")
         user = users_collection.aggregate(pipeline).next()
-
-        # Check if the user exists and the password is correct
+        print("found user",user)
         if user and check_password(password, user['password']):
             token = AccessToken()
             token['user_id'] = str(user['_id'])
@@ -143,13 +151,22 @@ def login(request):
             token['firstname']=user['firstname']
             token['lastname']=user['lastname']
             token['email']=user['email']
-            return JsonResponse({'access': str(token)}, status=200)
+            res = {
+                'status':True,
+                'message':'success',
+                'data':{
+                    'token':str(token)
+                }
+            }
+            return JsonResponse(res, status=200)
 
+        
         # If credentials are invalid, return an error response
         return JsonResponse({'error': 'Invalid credentials'}, status=401)
     
     except PyMongoError as e:
         # Handle any MongoDB-related errors
+        
         return JsonResponse({'error': f'Database error: {str(e)}'}, status=500)
     
     except json.JSONDecodeError:
@@ -157,6 +174,8 @@ def login(request):
     
     except StopIteration:
         # Handle cases where the user is not found
+        print("returning invalid credentials")
+
         return JsonResponse({'error': 'Invalid credentials'}, status=401)
     
     except Exception as e:

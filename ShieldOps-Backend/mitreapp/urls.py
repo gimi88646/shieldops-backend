@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .apis import user_manage,roles_management,incidents,user_roles_management,customers
+from .apis import user_manage,roles_management,incidents,user_roles_management,customers,sequences
 urlpatterns = [
     #path('run/', views.run, name='run'),
     path('post_single_mitre_rule/<str:mitre_rule_id>/', views.post_single_mitre_rule, name='post_single_mitre_rule'),
@@ -30,11 +30,18 @@ urlpatterns = [
     path('add_user_role/',user_roles_management.add_user_role,name="add_user_role"),
     path('get_user_role_by_user_id/<str:user_id>/',user_roles_management.get_user_role_by_user_id,name="get_user_role_by_user_id"),
     
+    path("get_users_by_role/<str:role_name>",user_roles_management.get_users_by_role,name="get_users_by_role"),
+    
     path('customers/add/',customers.addCustomer,name="add_customer"),
+    path('customers/get/',customers.get_all_customers,name="get_customers"),
 
     path('post_incident/',incidents.post_incident,name="post_incident"),
     path('get_incidents/',incidents.get_all_incidents,name="get_incidents"),
     path('get_incident/<str:id>/',incidents.get_incident,name="get_incident"),
-    path('add_comment_to_incident/<str:incident_id>/',incidents.add_comment_to_incident,name="add_comment_to_incident")
+    path('add_comment_to_incident/<str:incident_id>/',incidents.add_comment_to_incident,name="add_comment_to_incident"),
+
+    path('sequence/<str:company_code>',sequences.generate_incident_id,name="generate_incident_id"),
+    path('blob/upload',incidents.upload_blob,name="upload_blob")
+    
 
 ]

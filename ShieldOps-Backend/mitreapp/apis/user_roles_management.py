@@ -1,5 +1,5 @@
 from .forms import UserRoleForm
-from db_connection import user_roles_collection
+from db_connection import user_roles_collection,roles_collection
 from django.http import JsonResponse
 from bson.objectid import ObjectId
 from pymongo.errors import PyMongoError
@@ -82,3 +82,48 @@ def get_user_role_by_user_id(request,user_id):
     except Exception as e:
         return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
 
+def get_users_by_role(request,role_name):   
+    try:
+        pipeline = [
+            {
+                '$match': {
+                    'name': role_name
+                }
+            }, {
+                '$lookup': {
+                    'from': 'user_roles', 
+                    'localField': '_id', 
+                    'foreignField': 'role_id', 
+                    'as': 'roles'
+                }
+            }, {
+                '$lookup': {
+                    'from': 'users', 
+                    'localField': 'roles.user_id', 
+                    'foreignField': '_id', 
+                    'as': 'users'
+                }
+            }, {
+                '$project': {
+                    'users.password': 0, 
+                    'users.email': 0, 
+                    'users.created_on': 0, 
+                    'roles': 0, 
+                    'permissions': 0
+                }
+            }
+        ]
+        result = roles_collection.aggregate(pipeline).next()
+        if result:
+            result['_id']=str(result['_id'])
+            print(result)
+            for  user in result['users']:
+                user['_id']=str(user['_id'])
+
+            return JsonResponse(result, safe=False)
+        else:
+            return JsonResponse({"error": "No users found for this role"}, status=404)
+    except StopIteration as  e:
+        return JsonResponse({"error": "No users found for this role"}, status=404)
+    except Exception as e:
+        return JsonResponse({'status':'error','message':'something went wrong: '+str(e)},status=500)

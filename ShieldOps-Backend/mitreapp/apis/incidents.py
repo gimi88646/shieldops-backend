@@ -1,11 +1,11 @@
-from db_connection import incidents_collection
+from db_connection import incidents_collection,playbookrules_collection,artifact_collection
 from .sequences import get_next_incident_seq
 from .forms import IncidentForm,IncidentCommentForm
 from django.views.decorators.csrf import csrf_exempt
 from ..utils.role_required import roles_required
 from django.http import JsonResponse
 import json
-from bson import ObjectId,errors
+from bson import ObjectId,errors,Binary
 
 @csrf_exempt
 def post_incident(request):
@@ -13,29 +13,34 @@ def post_incident(request):
         return JsonResponse({'status': 'error', 'message': 'method not allowed.'}, status=405)
   
     try:
-        body = request.body 
-        body_str = body.decode('utf-8')  
-        incident = json.loads(body_str)  
+        incident = json.loads(request.body.decode('utf-8') )  
         form = IncidentForm(incident)
         if form.is_valid():        
             cleaned_data = form.cleaned_data
+            
+            
             incident_type = incident["incident_type"]
+            assigned_engineers =  incident["assigned_engineers"]
+            
             if not isinstance(incident_type,list):
                 return JsonResponse({'status': 'error', 'message': 'incident type must be of type list of strings'}, status=500)
-            
-            customer_code = cleaned_data["customer_code"]
-            # generate sequence for incident id
-            seq = get_next_incident_seq(customer_code)
-            incident_id =  str(customer_code)+"-"+str(seq) 
-            cleaned_data["_id"] = incident_id
-            
+            if not isinstance(assigned_engineers,list):
+                return  JsonResponse({'status': 'error', 'message': 'assigned engineers must be of type list of strings'},status=500)
+                
             cleaned_data["incident_type"] = incident_type
+            cleaned_data["assigned_engineers"] = assigned_engineers
+
+
+            # before saving the incident, fetch playbook and add it to the incident document
+            playbook_query = {"rule_type":{"$in":incident_type}}
+            pb_rules = playbookrules_collection.find(playbook_query,{"_id":0})
+            cleaned_data["pb_rules"] = list(pb_rules)
+
             result = incidents_collection.insert_one(cleaned_data)
             if not result:
                 return JsonResponse({'status': 'error', 'message': 'failed to save.'}, status=500)
-            cleaned_data["incident_id"] = str(cleaned_data["_id"])
-            del cleaned_data["_id"]
-
+            cleaned_data["_id"] = str(cleaned_data["_id"])
+            del cleaned_data["pb_rules"]
             return JsonResponse(cleaned_data, status=201)
         else:
             return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
@@ -90,3 +95,36 @@ def add_comment_to_incident(request,incident_id):
         return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt
+def upload_blob(request):
+    """TEST"""
+    if request.method == 'POST' and request.FILES.get('blob'):
+        blob_file = request.FILES['blob'].read()
+
+        # Convert the blob to binary data
+        binary_data = Binary(blob_file)
+
+        # Save the binary data to a MongoDB collection
+        result = artifact_collection.insert_one({
+            'filename': request.FILES['blob'].name,
+            'data': binary_data
+        })
+
+        return JsonResponse({'file_id': str(result.inserted_id), 'message': 'Blob saved successfully.'})
+    else:
+        return JsonResponse({'error': 'No blob found in the request.'}, status=400)
+
+        """
+            blob_file = request.FILES['artifact'].read()
+
+            # Convert the blob to binary data
+            binary_data = Binary(blob_file)
+
+            # Save the binary data to a MongoDB collection
+            result = artifact_collection.insert_one({
+                'filename': request.FILES['blob'].name,
+                'data': binary_data
+            })
+            cleaned_data["artifact_id"]=result.inserted_id
+            """
