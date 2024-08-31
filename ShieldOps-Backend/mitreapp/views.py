@@ -11,7 +11,7 @@ import json
 import requests
 import re
 from stix2 import Sighting, File, Indicator, Malware, Relationship, Bundle, AttackPattern, Grouping, IPv4Address , MACAddress, NetworkTraffic, ThreatActor, ObservedData, UserAccount, Process
-    
+from collections import Counter
 def extract_interval(interval_query):
     pattern = r'(\d+)([smh])'
     matches = re.findall(pattern, interval_query)
@@ -946,6 +946,58 @@ def get_all_events(request):
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@csrf_exempt    
+def get_all_event_names(request):
+    if request.method == "POST":
+        #seconds, minutes, hours
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            #"Authorization": "ApiKey {}".format(settings.ELASTIC_API_KEY)
+            
+        }
+        # index_url_inner = "http://192.168.1.103:9200/mitre_stix/_search"
+        index_url_inner = f"{settings.ELASTIC_HOST}/mitre_stix/_search"
+        response = requests.get(index_url_inner, headers=headers)
+        event_list=[]
+        if response.status_code == 200:
+            result = response.json()
+            # print(result)
+            hits=result['hits']['hits']
+            
+            for hit in hits:
+                print("proccessing hit")
+                rule_id = hit['_source']['rule_id']
+                event_id = hit['_id']
+                
+                # Identify Rule
+                # get_rule_details = "http://192.168.1.103:9200/mitre_rules/_doc/"+rule_id
+                get_rule_details = f"{settings.ELASTIC_HOST}/mitre_rules/_doc/{rule_id}"
+                rule_details_response = requests.get(get_rule_details, headers=headers)
+                if rule_details_response.ok:
+                    rule_response_json=rule_details_response.json()
+                    # print("rule_details_response=",rule_details_response)
+                    name=rule_response_json["_source"]["name"]
+                    description =rule_response_json["_source"]["description"]
+                    event_id = hit['_id']
+                    event={
+                        # "event_id": event_id,
+                        "event_name": name,
+                        # "event_description": description
+                    }
+                    event_list.append(event)
+                    
+                    # Create the list of objects with "process_name" and "Count"
+
+            event_names = [item['event_name'] for item in event_list]
+            counts = Counter(event_names)       
+            # return JsonResponse(json.loads(json.dumps(counts)), safe=False)
+            result = [{"event_name": event_name, "Count": count} for event_name, count in counts.items()]
+            return JsonResponse(result, safe=False)
+        else:
+            return JsonResponse({'error': 'Failed to retrieve data from Elasticsearch'}, status=500)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 @csrf_exempt
 def get_syslog_events(request):
         if request.method == "GET":

@@ -14,6 +14,7 @@ urlpatterns = [
     path('delete_all_mitre_rules/', views.delete_all_mitre_rules, name='delete_all_mitre_rules'),
     path('generate_stix/<str:event_rule_id>/', views.generate_stix, name='generate_stix'),
     path('get_all_events/', views.get_all_events, name='get_all_events'),
+    path('get_all_event_names/', views.get_all_event_names, name='get_all_events-names'),
     path('get_syslog_events/',views.get_syslog_events, name="get_syslog_events"),
     path('get_splunk_events/',views.get_splunk_events, name="get_splunk_events"),
     path('get_splunk_offenses/',views.get_offenses, name="get_offenses"),
