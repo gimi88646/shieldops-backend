@@ -27,6 +27,11 @@ def buildQueries(query,mappings):
     return queries
 
 def runQueries(queries,index,schedule_name):
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"ApiKey {settings.ELASTIC_API_KEY}",
+    }
     for q in queries:
             index_url_inner = f"{settings.ELASTIC_HOST}/{index}/_eql/search"
             response = requests.get(index_url_inner, headers=headers, data=json.dumps({"query":q}))
@@ -42,7 +47,7 @@ def runQueries(queries,index,schedule_name):
                     if response.ok:
                         print("data posted to mitre_stix",response.json())                        
                     else:
-                        print("failed to post the data to mitre_stix index,",reponse.content)
+                        print("failed to post the data to mitre_stix index,",response.content)
                 else:
                     print("no hits found")
             else:
