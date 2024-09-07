@@ -11,8 +11,12 @@ from rest_framework_simplejwt.tokens import RefreshToken,AccessToken
 from django.contrib.auth.hashers import make_password,check_password
 # from rest_framework import status
 from datetime import datetime
+
 from ..utils.role_required import roles_required
+from ..utils.gen_response import generate_response
+
 from pymongo.errors import PyMongoError
+# from rest_framework.response import Response
 
 
 
@@ -30,14 +34,13 @@ def addUser(request):
             cleaned_data["created_on"] = datetime.now().isoformat()
             user = users_collection.find_one({"email":cleaned_data["email"]})
             if user :
-                return JsonResponse({'status': 'error', 'message': 'email already exists.'}, status=409)
+                return generate_response(False,'failure',{'error':'email already exists'},409)
             roles = cleaned_data["roles"]
             del cleaned_data["roles"]
             result = users_collection.insert_one(cleaned_data)
             if not result:
-                return JsonResponse({'status': 'error', 'message': 'failed to save.'}, status=500)
+                return generate_response(False,'failure',{'error':'user not created'},409)
             
-            # save roles to user_roles collection
             if roles:
                 roles_list = [role.strip() for role in roles.split(',')]
                 role_ids = roles_collection.aggregate([
@@ -71,20 +74,23 @@ def addUser(request):
                         "role_id":default_role["_id"]
                     }
                 user_roles_collection.insert_one(user_role)
-
             user_dto = {
                 "user_id":str(cleaned_data["_id"]),
                 "firstname": cleaned_data["firstname"],
                 "lastname": cleaned_data["lastname"],
                 "email": cleaned_data["email"],
             }
-            return JsonResponse(user_dto, status=201)
+            return generate_response(True,'success',user_dto,201)
+
         else:
-            return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+            return generate_response(False,'failure',{'error':form.errors},400)
     except json.JSONDecodeError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
+        return  generate_response(False,'failure',{'error':'invalid json'},400)
+
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return  generate_response(False,'failure',{'error':'something went wrong'},500)
+
+
 
 
 @csrf_exempt
@@ -141,9 +147,7 @@ def login(request):
         ]
 
         # Execute the aggregation pipeline
-        print("finding user")
         user = users_collection.aggregate(pipeline).next()
-        print("found user",user)
         if user and check_password(password, user['password']):
             token = AccessToken()
             token['user_id'] = str(user['_id'])
@@ -151,35 +155,22 @@ def login(request):
             token['firstname']=user['firstname']
             token['lastname']=user['lastname']
             token['email']=user['email']
-            res = {
-                'status':True,
-                'message':'success',
-                'data':{
-                    'token':str(token)
-                }
-            }
-            return JsonResponse(res, status=200)
+            return generate_response(True,'success',{'token':str(token)},200)
 
-        
-        # If credentials are invalid, return an error response
-        return JsonResponse({'error': 'Invalid credentials'}, status=401)
-    
+
+        return  generate_response(False,'failure',{'error':'Invalid Credentials'},401)
     except PyMongoError as e:
-        # Handle any MongoDB-related errors
-        
-        return JsonResponse({'error': f'Database error: {str(e)}'}, status=500)
-    
+        print(e)
+        return generate_response(False,'failure',{'error':'Internal Server error'},500)
     except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-    
+        return generate_response(False,'failure',{'error':'Invalid JSON'},400)
     except StopIteration:
-        # Handle cases where the user is not found
-        print("returning invalid credentials")
-
-        return JsonResponse({'error': 'Invalid credentials'}, status=401)
-    
+        return generate_response(True,'failure',{'error': 'Invalid credentials'},status=401)
     except Exception as e:
-        return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
+        print(e)
+        return  generate_response(True,'failure',{'error': 'something went wrong.'},500)
+
+
     # if request.method !="POST":
     #     return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
         

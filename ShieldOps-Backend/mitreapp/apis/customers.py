@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-
+from ..utils.gen_response import generate_response
 @csrf_exempt
 def addCustomer(request):
     """add customer to the database, also initialize its incident counter"""
@@ -18,7 +18,7 @@ def addCustomer(request):
             cleaned_data = form.cleaned_data
             customer = customers_collection.find_one({"customer_name":cleaned_data["customer_name"]})
             if customer :
-                return JsonResponse({'status': 'error', 'message': 'customer already exists.'}, status=409)
+                return generate_response(False,'failure',{'error':'customer already exists'},status=409)
 
             cleaned_data["createdAt"] = datetime.now().isoformat()
             seq  = str(get_next_customer_seq())
@@ -33,17 +33,22 @@ def addCustomer(request):
             }
             counters_collection.insert_one(incident_counter)
             if not result:
-                return JsonResponse({'status': 'error', 'message': 'failed to save.'}, status=500)
+                return  generate_response(False,'failure',{'error':'customer not added'},status=500)
+
             
             cleaned_data["_id"] = str(cleaned_data["_id"])
-            return JsonResponse(cleaned_data, status=201)
+            return  generate_response(True,'success',{'customer':cleaned_data},status=201)
+
         else:
-            return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+            return  generate_response(False,'failure',{'error':form.errors},status=400)
+
     except json.JSONDecodeError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
+        return  generate_response(False,'failure',{'error':'invalid json'},status=400)
+
     except Exception as e:
         print(e)
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return   generate_response(False,'failure',{'error':'internal server error'},status=500)
+
 
 # with client.start_session(causal_consistency=True) as session:
                 # pass
@@ -54,6 +59,6 @@ def get_all_customers(request):
         customers = list(customers_collection.find())
         for customer in customers:
             customer['_id']=str(customer['_id'])
-        return JsonResponse(customers, safe=False)
+        return generate_response(True,'success',customers,200)
     except:
-        pass
+        return generate_response(False,'failure','something went wrong')

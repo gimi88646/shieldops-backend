@@ -3,8 +3,8 @@ from . import views
 from .apis import user_manage,roles_management,incidents,user_roles_management,customers,sequences
 urlpatterns = [
     #path('run/', views.run, name='run'),
-    path('post_single_mitre_rule/<str:mitre_rule_id>/', views.post_single_mitre_rule, name='post_single_mitre_rule'),
-    path('run_single_task/<str:task_id>/', views.run_single_task, name='run_single_task'),
+    path('test_mitre_rule/<str:mitre_rule_id>/', views.test_mitre_rule, name='post_single_mitre_rule'),
+    path('run_single_task/', views.run_single_task, name='run_single_task'),
     path('activate_task_by_id/<str:task_id>/', views.activate_task_by_id, name='activate_task_by_id'),
     path('deactivate_task_by_id/<str:task_id>/', views.deactivate_task_by_id, name='deactivate_task_by_id'),
     path('delete_task/<str:task_id>/', views.delete_task_by_id, name='delete_task_by_id'),
@@ -39,6 +39,7 @@ urlpatterns = [
     path('get_incidents/',incidents.get_all_incidents,name="get_incidents"),
     path('get_incident/<str:id>/',incidents.get_incident,name="get_incident"),
     path('add_comment_to_incident/<str:incident_id>/',incidents.add_comment_to_incident,name="add_comment_to_incident"),
+    path('update_incident_playbook/',incidents.update_incident_playbook,name="update_incident_playbook"),
 
     path('sequence/<str:company_code>',sequences.generate_incident_id,name="generate_incident_id"),
     path('blob/upload',incidents.upload_blob,name="upload_blob")

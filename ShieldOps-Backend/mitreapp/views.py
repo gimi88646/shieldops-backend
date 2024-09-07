@@ -37,22 +37,30 @@ def extract_interval(interval_query):
     return time_list
 
 @csrf_exempt
-def run_single_task(request, task_id):
+def run_single_task(request):
     if request.method == 'POST':
-        
+        # get body from request
+        body = json.loads(request.body.decode('utf8'))
+        task_id = body.get('rule_id')
+        index = body.get('index')
+        # print task_id and index
+        print(task_id,index)
+
         schedule, created = IntervalSchedule.objects.get_or_create(every=60, period=IntervalSchedule.SECONDS)
 
         PeriodicTask.objects.get_or_create(
                                         name=task_id,
                                        task='mitreapp.task.run_single_active_query_task',
                                        interval=schedule,
-                                       args=json.dumps([str(task_id)]))
+                                       args=json.dumps([task_id,index]))
         
         # print(PeriodicTask.objects.all())
 
         return JsonResponse({'message': f"Celery Beat task with ID '{task_id}' started successfully."})
     else:
         return JsonResponse("Method not allowed", status=405)
+
+
 
 
 @csrf_exempt
@@ -116,10 +124,11 @@ def delete_task_by_id(request, task_id):
     
 #useless for now 
 @csrf_exempt
-def post_single_mitre_rule(request, mitre_rule_id):
+def test_mitre_rule(request, mitre_rule_id):
     """single mitre is run, on some index, if rule hits any result it is sent in response"""
     if request.method == 'POST':
-        index_url = f"{settings.ELASTIC_HOST}/mitrerulestest/_doc/{mitre_rule_id}"
+        index_url = f"{settings.ELASTIC_HOST}/mitre_rules/_doc/{mitre_rule_id}"
+        print(index_url)
         headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -145,7 +154,7 @@ def post_single_mitre_rule(request, mitre_rule_id):
             
             print(data)
             
-            index_url_inner = "{}/test_new_index/_eql/search".format(settings.ELASTIC_HOST)
+            index_url_inner = "{}/splunk_data/_eql/search".format(settings.ELASTIC_HOST)
             response = requests.post(index_url_inner, headers=headers, json=data)
             if response.status_code == 200:
                 result = response.json()
@@ -210,7 +219,7 @@ def run_all_mitre_rules(request):
             'Content-Type': 'application/json',
             "Authorization": "ApiKey {}".format(settings.ELASTIC_API_KEY)
         }
-        index_url_inner = "{}/test-rules/_search?size=100".format(settings.ELASTIC_HOST)
+        index_url_inner = "{}/mitre_rules/_search?size=1000".format(settings.ELASTIC_HOST)
         response = requests.post(index_url_inner, headers=headers)
 
         if response.status_code == 200:
@@ -314,9 +323,9 @@ def generate_stix(request, event_rule_id):
             for threat in threats:
                 tactic_name=threat["tactic"]["name"]
                 print(tactic_name)
-                tactic_technique=threat.get("techniques", [])
-                techinques_dict={}
-                subtechniques_dict={}
+                tactic_technique = threat.get("techniques", [])
+                techinques_dict = {}
+                subtechniques_dict = {}
                 if(tactic_technique):
                     for techniques in tactic_technique:
                         techinques_dict[techniques["id"]] = techniques["name"]
@@ -1192,7 +1201,62 @@ def get_hourly_logs_histogram(request):
         resp_json = res.json()
         return JsonResponse(resp_json)
 
+# def run_single_active_query_task(request,task_id):
 
+#         headers = {
+#             'Accept': 'application/json',
+#             'Content-Type': 'application/json',
+#             "Authorization": "ApiKey {}".format(settings.ELASTIC_API_KEY)
+#         }
+#         index_url_inner = f"{settings.ELASTIC_HOST}/mitre_rules/{settings.ELASTIC_HOST}"
+#         response = requests.get(index_url, headers=headers)
+#         response.raise_for_status()
+            
+#         data = response.json()
+#         query = data.get('_source', {}).get('query', 'Query not found')
+            
+#         query = str(query)
+#         query = query.replace('\\"', '"')
+#         query = query.replace('\n', '').strip()
+        
+#         data = {
+#             "query": """
+#             {}
+#             """.format(query)
+#         }
+            
+            
+#         index_url_inner = "{}/splunk_data/_eql/search".format(settings.ELASTIC_HOST)
+#         response = requests.post(index_url_inner, headers=headers, json=data)
+#         if response.status_code == 200:
+#             result = response.json()
+                        
+#             return JsonResponse({'result':result})
+#         return JsonResponse({'query':"Success"})
+        
+#         if response.status_code == 200:
+#             result = response.json()
+#             if result["hits"]:
+#                 hits = result["hits"]['hits']
+#                 for hit in hits:
+#                     task_id=hit['_id']
+#                     print("taskid=",task_id)
+#                     interval_query=hit['_source']['from']
+#                     time_list=extract_interval(interval_query)
+#                     print("time_list=",time_list)
+#                     schedule, created = IntervalSchedule.objects.get_or_create(every=time_list[0], period=time_list[1])
+#                     PeriodicTask.objects.get_or_create(
+#                                     name=task_id,
+#                                        task='mitreapp.task.run_single_active_query_task',
+#                                        interval=schedule,
+#                                        args=json.dumps([str(task_id),"splunk_data"]))
+#                 return JsonResponse({'Result': result["hits"]['total']['value']})
+#             else:
+#                 return JsonResponse({'error': 'No hits found in Elasticsearch'}, status=404)
+#         else:
+#             return JsonResponse({'error': 'Failed to retrieve data from Elasticsearch'}, status=500)
+
+    
 
 # def run(request):
     

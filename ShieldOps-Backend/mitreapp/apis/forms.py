@@ -78,3 +78,15 @@ class IncidentForm(forms.Form):
     # team formation
     # owner = forms.CharField()
     # membership_chooser = forms.CharField()
+
+class UpdateIncidentPlaybook(forms.Form):
+    incident_id = forms.CharField(validators=[validate_object_id],help_text="invalid object id for incident")
+    playbook_id =  forms.CharField(validators=[validate_object_id],help_text="invalid object id for playbook")
+    rule_type =  forms.CharField(help_text="rule type field required")
+    category =  forms.CharField(help_text="category field is required")
+    rule_name =   forms.CharField(help_text="rule name field is required")
+    rule_status =  forms.CharField(help_text="rule status field is required")
+    rule_comments = forms.CharField(required=False)
+    rule_risk =  forms.CharField(required=False)
+    
+

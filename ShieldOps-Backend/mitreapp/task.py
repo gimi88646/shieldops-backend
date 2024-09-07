@@ -26,17 +26,42 @@ def buildQueries(query,mappings):
             queries.extend(tquery)   
     return queries
 
+def get_events(hits):
+    events=[]
+    if 'sequences' in hits:
+        for  sequence in hits['sequences']:
+            # select the last message in the sequence, this shows the attack has been successful.
+            events.append(sequence['events'][-1])
+    else:
+        events=hits['events']
+    return events
+
+
+
+
 def runQueries(queries,index,schedule_name):
+    headers = { 
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        "Authorization": f"ApiKey {settings.ELASTIC_API_KEY}",
+    }
     for q in queries:
             index_url_inner = f"{settings.ELASTIC_HOST}/{index}/_eql/search"
             response = requests.get(index_url_inner, headers=headers, data=json.dumps({"query":q}))
+            print(f"query = {q}")
+        
             if response.ok:
                 result = response.json()
+                print(result)
                 if result['hits']['total']['value']:
-                    event={
+                    event = {
                         "rule_id": schedule_name,
-                        "event": result['hits']['hits']
+                        "events": get_events(result['hits']),
+                        # save datetime in iso standard
+                        'created_on':  datetime.now().isoformat(),
                     }
+                    
+
                     index_url_inner = f"{settings.ELASTIC_HOST}/mitre_stix/_doc"
                     response = requests.post(index_url_inner, headers=headers, json=event)
                     if response.ok:
@@ -169,87 +194,6 @@ def parse_winlog(log_entry):
 
 
 
-# def send_splunk_to_elastic(queries,es_index):
-#     es_url = "http://192.168.1.103:9200/{}/_bulk"
-#     headers = {
-#         'Accept': 'application/json',
-#         'Content-Type': 'application/json',
-#         "Authorization": "ApiKey MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw=="
-#     }
-#     username="admin"
-#     password="admin123"
-#     splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs'.format(username)
-#     search_ids = []
-#     for i in range(len(queries)):
-#         ID = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
-#         search_ids.append(ID)
-#         query ={
-#             'id':ID,
-#             'search': queries[i],
-#             'earliest_time': '-24h',
-#             'latest_time': 'now'
-#         }
-
-#         # requests data from splunk of last 24 hours for alert i
-#         resp = requests.post(splunk_search_base_url, data=query, verify=False, auth=(username, password))
-#         if resp.ok:
-#             print("success")
-#         else:
-#             print("fails",resp.content)
-#             return
-#     is_job_completed=''
-#     # Polling for Job Completion
-#     data = []
-#     i=0
-#     offset = 0
-#     page_size = 100
-#     get_data = {
-#         'output_mode': 'json',
-#         'count': page_size,
-#         'offset': offset
-#     }
-#     while queries != []:
-#         time.sleep(1)
-#         splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}'.format(username, search_ids[i])
-#         resp_job_status = requests.post(splunk_search_base_url, data=get_data, verify=False, auth=(username, password))
-#         resp_job_status_data=resp_job_status.json()
-#         is_job_completed=resp_job_status_data['entry'][0]['content']['dispatchState']
-#         if is_job_completed =="DONE":
-#             while True:
-#                 get_data = {
-#                     'output_mode': 'json',
-#                     'count': page_size,
-#                     'offset': offset
-#                 }
-#                 splunk_search_summary_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}/results'.format(username, search_ids[i])
-#                 resp_job_status = requests.get(splunk_search_summary_url, params=get_data, verify=False, auth=(username, password))
-#                 resp_job_status_data=resp_job_status.json()
-#                 if not resp_job_status_data['results']:
-#                     break
-#                 data.extend(resp_job_status_data['results']) 
-#                 offset+=page_size
-#             del search_ids[i]
-#             if search_ids == []:
-#                 break
-#             i%=len(search_ids)
-#         else:
-#             i = (i+1)%len(search_ids) 
-
-#     print("length of data={}".format(len(data)))    
-#     step=100
-#     j = 0
-#     return
-#     for i in range(0,len(data),step):
-#         j+=step
-#         # increasing step size that is the bulk size results in polynomial time of n2 for getBatch method,
-#         batch = getBatch(data[i:j],False)
-#         j+=step
-#         resp1 = requests.post(es_url.format(es_index), headers=headers, data=batch,verify=False)
-#         if  resp1.ok:
-#             print("okay status")
-#         else :
-#             print("NOT OKAY:",resp1.content)
-
 def send_splunk_to_logstash(queries,es_index):
     # username = settings.SPLUNK_USERNAME
     # password = settings.SPLUNK_PASSWORD
@@ -265,7 +209,7 @@ def send_splunk_to_logstash(queries,es_index):
         search_ids.append(ID)
         
         # requests data from splunk of last 24 hours for query q
-        query ={
+        query = {
             'id':ID,
             'search': q.replace("\n",""),
             'earliest_time': '-10m',
@@ -277,7 +221,7 @@ def send_splunk_to_logstash(queries,es_index):
             return
 
     """ Polling for Job Completion"""
-    is_job_completed=''
+    is_job_completed = ''
     get_data = {
         'output_mode': 'json',
     }
@@ -360,9 +304,9 @@ def send_splunk_to_pushed_offense():
 
 @shared_task
 def run_single_active_query_task(schedule_name,index):
-    print("schedule_name=",schedule_name)
-    index_url = f"{settings.ELASTIC_HOST}/mitre-rules/_doc/{schedule_name}"
-    headers = {
+    print(f"running rule with id {schedule_name}")
+    index_url = f"{settings.ELASTIC_HOST}/mitre_rules/_doc/{schedule_name}"
+    headers = { 
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         "Authorization": f"ApiKey {settings.ELASTIC_API_KEY}",
@@ -374,14 +318,14 @@ def run_single_active_query_task(schedule_name,index):
         data = response.json()
         query = data.get('_source', {}).get('query', 'Query not found').replace("\n","")
         
-        mappings_response = requests.get(f"{settings.ELASTIC_HOST}/ecs_mappings/_doc/2",headers=headers)
-        mappings = mappings_response.json()["_source"]
-        print(mappings)
+        # mappings_response = requests.get(f"{settings.ELASTIC_HOST}/ecs_mappings/_doc/2",headers=headers)
+        # mappings = mappings_response.json()["_source"]
+        # print(mappings)
         
-        queries = buildQueries(query=query,mappings=mappings)
+        # queries = buildQueries(query=query,mappings=mappings)
         # for now, we have two indices for testing, this code can later be changed 
         # runQueries(index="syslogs_index",queries=queries,schedule_name=schedule_name)
-        runQueries(index=index,queries=queries,schedule_name=schedule_name)
+        runQueries(index=index,queries=[query],schedule_name=schedule_name)
 
     except Exception as ex:
         print("error occurred",ex)
@@ -671,3 +615,88 @@ def send_splunk_to_elastic():
     resp_job_status_data=resp_job_status.json()
 
     """
+
+
+
+    
+
+# def send_splunk_to_elastic(queries,es_index):
+#     es_url = "http://192.168.1.103:9200/{}/_bulk"
+#     headers = {
+#         'Accept': 'application/json',
+#         'Content-Type': 'application/json',
+#         "Authorization": "ApiKey MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw=="
+#     }
+#     username="admin"
+#     password="admin123"
+#     splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs'.format(username)
+#     search_ids = []
+#     for i in range(len(queries)):
+#         ID = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
+#         search_ids.append(ID)
+#         query ={
+#             'id':ID,
+#             'search': queries[i],
+#             'earliest_time': '-24h',
+#             'latest_time': 'now'
+#         }
+
+#         # requests data from splunk of last 24 hours for alert i
+#         resp = requests.post(splunk_search_base_url, data=query, verify=False, auth=(username, password))
+#         if resp.ok:
+#             print("success")
+#         else:
+#             print("fails",resp.content)
+#             return
+#     is_job_completed=''
+#     # Polling for Job Completion
+#     data = []
+#     i=0
+#     offset = 0
+#     page_size = 100
+#     get_data = {
+#         'output_mode': 'json',
+#         'count': page_size,
+#         'offset': offset
+#     }
+#     while queries != []:
+#         time.sleep(1)
+#         splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}'.format(username, search_ids[i])
+#         resp_job_status = requests.post(splunk_search_base_url, data=get_data, verify=False, auth=(username, password))
+#         resp_job_status_data=resp_job_status.json()
+#         is_job_completed=resp_job_status_data['entry'][0]['content']['dispatchState']
+#         if is_job_completed =="DONE":
+#             while True:
+#                 get_data = {
+#                     'output_mode': 'json',
+#                     'count': page_size,
+#                     'offset': offset
+#                 }
+#                 splunk_search_summary_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}/results'.format(username, search_ids[i])
+#                 resp_job_status = requests.get(splunk_search_summary_url, params=get_data, verify=False, auth=(username, password))
+#                 resp_job_status_data=resp_job_status.json()
+#                 if not resp_job_status_data['results']:
+#                     break
+#                 data.extend(resp_job_status_data['results']) 
+#                 offset+=page_size
+#             del search_ids[i]
+#             if search_ids == []:
+#                 break
+#             i%=len(search_ids)
+#         else:
+#             i = (i+1)%len(search_ids) 
+
+#     print("length of data={}".format(len(data)))    
+#     step=100
+#     j = 0
+#     return
+#     for i in range(0,len(data),step):
+#         j+=step
+#         # increasing step size that is the bulk size results in polynomial time of n2 for getBatch method,
+#         batch = getBatch(data[i:j],False)
+#         j+=step
+#         resp1 = requests.post(es_url.format(es_index), headers=headers, data=batch,verify=False)
+#         if  resp1.ok:
+#             print("okay status")
+#         else :
+#             print("NOT OKAY:",resp1.content)
