@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .apis import user_manage,roles_management,incidents,user_roles_management,customers,sequences
+from .apis import user_manage,roles_management,incidents,user_roles_management,customers,sequences,stix
 urlpatterns = [
     #path('run/', views.run, name='run'),
     path('test_mitre_rule/<str:mitre_rule_id>/', views.test_mitre_rule, name='post_single_mitre_rule'),
@@ -12,7 +12,7 @@ urlpatterns = [
     path('run_all_mitre_rules/', views.run_all_mitre_rules, name='run_all_mitre_rules'),
     path('run_mitre_rules_on_offenses/', views.run_mitre_rules_on_offenses, name='run_mitre_rules_on_offenses'),
     path('delete_all_mitre_rules/', views.delete_all_mitre_rules, name='delete_all_mitre_rules'),
-    path('generate_stix/<str:event_rule_id>/', views.generate_stix, name='generate_stix'),
+    path('generate_stix', stix.generate_stix, name='generate_stix'),
     path('get_all_events/', views.get_all_events, name='get_all_events'),
     path('get_syslog_events/',views.get_syslog_events, name="get_syslog_events"),
     path('get_splunk_events/',views.get_splunk_events, name="get_splunk_events"),
@@ -42,7 +42,7 @@ urlpatterns = [
     path('update_incident_playbook/',incidents.update_incident_playbook,name="update_incident_playbook"),
 
     path('sequence/<str:company_code>',sequences.generate_incident_id,name="generate_incident_id"),
-    path('blob/upload',incidents.upload_blob,name="upload_blob")
+    # path('blob/upload',incidents.upload_blob,name="upload_blob")
     
 
 ]

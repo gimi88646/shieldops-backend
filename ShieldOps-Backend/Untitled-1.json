@@ -1,0 +1,151 @@
+{
+    "type": "bundle",
+    "id": "bundle--4f22177a-c59e-4eb9-9971-eb2e8d89e46b",
+    "objects": [
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "value": "SRC IP: 192.168.1.39 - SRC Port: ",
+            "defanged": true
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--a3c2a106-1901-5bd1-8355-2dc962c41804",
+            "value": "DEST IP: 192.168.1.30 - DEST Port: 37850",
+            "defanged": true
+        },
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--b5c4595f-3654-4ab7-8269-57afd1b363a2",
+            "created": "2024-09-07T10:26:45.728262Z",
+            "modified": "2024-09-07T10:26:45.728262Z",
+            "name": "192.168.1.39",
+            "roles": [
+                "Hacker"
+            ],
+            "goals": [
+                "Scanning"
+            ]
+        },
+        {
+            "type": "network-traffic",
+            "spec_version": "2.1",
+            "id": "network-traffic--b1b74964-b69b-5768-be21-e33a479f3cc9",
+            "src_ref": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "dst_ref": "ipv4-addr--a3c2a106-1901-5bd1-8355-2dc962c41804",
+            "src_port": 22,
+            "dst_port": 37850,
+            "protocols": [
+                "tcp"
+            ]
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--d7a45675-0418-4970-a3e4-3c321e06632f",
+            "created": "2024-09-07T10:26:45.728262Z",
+            "modified": "2024-09-07T10:26:45.728262Z",
+            "relationship_type": "targets",
+            "source_ref": "threat-actor--b5c4595f-3654-4ab7-8269-57afd1b363a2",
+            "target_ref": "ipv4-addr--a3c2a106-1901-5bd1-8355-2dc962c41804"
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "value": "SRC IP: 192.168.1.39 - SRC Port: ",
+            "defanged": true
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--4ad32c66-abd3-5116-8d9e-4de62bedf8ff",
+            "value": "DEST IP: 192.168.1.30 - DEST Port: 43622",
+            "defanged": true
+        },
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--88f4e6e6-6ed8-4788-ab1e-c98109a39e69",
+            "created": "2024-09-07T10:26:45.728262Z",
+            "modified": "2024-09-07T10:26:45.728262Z",
+            "name": "192.168.1.39",
+            "roles": [
+                "Hacker"
+            ],
+            "goals": [
+                "Scanning"
+            ]
+        },
+        {
+            "type": "network-traffic",
+            "spec_version": "2.1",
+            "id": "network-traffic--eae5155c-6a40-54d7-b0aa-092f7e900359",
+            "src_ref": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "dst_ref": "ipv4-addr--4ad32c66-abd3-5116-8d9e-4de62bedf8ff",
+            "src_port": 22,
+            "dst_port": 43622,
+            "protocols": [
+                "tcp"
+            ]
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--9b4072e2-ae81-4717-9557-08d6cbfd2864",
+            "created": "2024-09-07T10:26:45.736268Z",
+            "modified": "2024-09-07T10:26:45.736268Z",
+            "relationship_type": "targets",
+            "source_ref": "threat-actor--88f4e6e6-6ed8-4788-ab1e-c98109a39e69",
+            "target_ref": "ipv4-addr--4ad32c66-abd3-5116-8d9e-4de62bedf8ff"
+        },
+        {
+            "type": "grouping",
+            "spec_version": "2.1",
+            "id": "grouping--ad02bdcc-ab86-4005-9a1a-523f54fe2e2a",
+            "created": "2024-09-07T10:26:45.73831Z",
+            "modified": "2024-09-07T10:26:45.73831Z",
+            "name": "test_group",
+            "description": "Grouping....",
+            "context": "test_group",
+            "object_refs": [
+                "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+                "ipv4-addr--a3c2a106-1901-5bd1-8355-2dc962c41804",
+                "threat-actor--b5c4595f-3654-4ab7-8269-57afd1b363a2",
+                "network-traffic--b1b74964-b69b-5768-be21-e33a479f3cc9",
+                "relationship--d7a45675-0418-4970-a3e4-3c321e06632f",
+                "attack-pattern--bf59c180-25cd-4981-9f13-9edf84902410",
+                "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+                "ipv4-addr--4ad32c66-abd3-5116-8d9e-4de62bedf8ff",
+                "threat-actor--88f4e6e6-6ed8-4788-ab1e-c98109a39e69",
+                "network-traffic--eae5155c-6a40-54d7-b0aa-092f7e900359",
+                "relationship--9b4072e2-ae81-4717-9557-08d6cbfd2864",
+                "attack-pattern--bf59c180-25cd-4981-9f13-9edf84902410"
+            ]
+        },
+        {
+            "type": "attack-pattern",
+            "spec_version": "2.1",
+            "id": "attack-pattern--bf59c180-25cd-4981-9f13-9edf84902410",
+            "created": "2020-03-02T18:45:07.892Z",
+            "modified": "2020-10-18T01:55:03.337Z",
+            "name": "Brute Force",
+            "description": "Identifies multiple external consecutive login failures targeting a user account from the same source address within\\r\\na short time interval. Adversaries will often brute force login attempts across multiple users with a common or known\\r\\npassword, in an attempt to gain access to these accounts.\\r\\n",
+            "kill_chain_phases": [
+                {
+                    "kill_chain_name": "mitre-attack",
+                    "phase_name": "Credential Access"
+                }
+            ],
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "external_id": "T1110"
+                }
+            ]
+        }
+    ]
+}

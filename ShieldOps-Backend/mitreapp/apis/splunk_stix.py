@@ -28,7 +28,7 @@ def runQueries(queries,index,schedule_name):
                     if response.ok:
                         print("data posted to mitre_stix",response.json())                        
                     else:
-                        print("failed to post the data to mitre_stix index,",reponse.content)
+                        print("failed to post the data to mitre_stix index,",response.content)
                 else:
                     print("no hits found")
             else:

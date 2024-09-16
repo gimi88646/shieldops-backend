@@ -35,7 +35,7 @@ services:
     restart: always
     environment:
       - MONGO_URL=mongodb://192.168.1.101:27017
-      - SPLUNK_HOST=192.168.1.102:8086
+      - SPLUNK_HOST=https://192.168.1.38:8089
       - SPLUNK_API_KEY=Splunk af0bd3f1-4cb9-408c-86b7-be72e308aa8d
       - ELASTIC_API_KEY=MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw==
       - ELASTIC_HOST=http://192.168.1.103:9200
@@ -60,7 +60,7 @@ services:
       - ./ShieldOps-Backend:/usr/src/app
     restart: always
     environment:
-      - SPLUNK_HOST=192.168.1.102:8086
+      - SPLUNK_HOST=https://192.168.1.38:8089
       - SPLUNK_API_KEY=Splunk af0bd3f1-4cb9-408c-86b7-be72e308aa8d
       - ELASTIC_API_KEY=MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw==
       - ELASTIC_HOST=http://192.168.1.103:9200

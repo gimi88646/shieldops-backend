@@ -2,7 +2,6 @@ from celery import shared_task
 from celery import current_app
 from celery.schedules import crontab    
 import requests
-import time
 import json
 from django.http import HttpResponse, JsonResponse
 from django.conf import settings
@@ -10,10 +9,11 @@ from datetime import datetime
 import asyncio
 import gc
 import os
-# from .task_helpers import send_splunk_to_logstash
-from django.conf import settings
 import random
 import string
+import time
+import urllib.parse
+import re
 
 def buildQueries(query,mappings):
     queries=[query.replace("\n","")]
@@ -36,9 +36,6 @@ def get_events(hits):
         events=hits['events']
     return events
 
-
-
-
 def runQueries(queries,index,schedule_name):
     headers = { 
         'Accept': 'application/json',
@@ -46,32 +43,61 @@ def runQueries(queries,index,schedule_name):
         "Authorization": f"ApiKey {settings.ELASTIC_API_KEY}",
     }
     for q in queries:
-            index_url_inner = f"{settings.ELASTIC_HOST}/{index}/_eql/search"
-            response = requests.get(index_url_inner, headers=headers, data=json.dumps({"query":q}))
-            print(f"query = {q}")
-        
-            if response.ok:
-                result = response.json()
-                print(result)
-                if result['hits']['total']['value']:
-                    event = {
-                        "rule_id": schedule_name,
-                        "events": get_events(result['hits']),
-                        # save datetime in iso standard
-                        'created_on':  datetime.now().isoformat(),
-                    }
-                    
+        index_url_inner = f"{settings.ELASTIC_HOST}/{index}/_eql/search"
+        # run this eql query using filter, in that filter specify the time lowercap, till now, this information is stored in elasticsearch
+        response = requests.get(f"{settings.ELASTIC_HOST}/schedules/_doc/{schedule_name}")
+        time_lowercap = None
+        if response.ok:
+            schedule = response.json()
+            time_lowercap = schedule['_source']['last_run']
 
-                    index_url_inner = f"{settings.ELASTIC_HOST}/mitre_stix/_doc"
-                    response = requests.post(index_url_inner, headers=headers, json=event)
-                    if response.ok:
-                        print("data posted to mitre_stix",response.json())                        
-                    else:
-                        print("failed to post the data to mitre_stix index,",reponse.content)
+        last_run = datetime.now().isoformat()
+        search_body = {
+            "query":q,
+            "filter" : {
+                "range":{
+                    "@timestamp":{
+                        "lte":last_run
+                    }
+                }
+            }
+        }
+            
+        if time_lowercap:
+            search_body['filter']['range']['@timestamp']['gte']=time_lowercap
+
+        print(f"running rule {schedule_name} from {time_lowercap} to {last_run}")
+        response = requests.post(index_url_inner, headers=headers, data=json.dumps(search_body))
+
+        if response.ok:
+            result = response.json()
+            print(result)
+            if result['hits']['total']['value']:
+                event = {
+                    "rule_id": schedule_name,
+                    "events": get_events(result['hits']),
+                    # save datetime in iso standard
+                    'created_on':  datetime.now().isoformat(),
+                }
+                
+
+                index_url_inner = f"{settings.ELASTIC_HOST}/mitre_stix/_doc"
+                response = requests.post(index_url_inner, headers=headers, json=event)
+                if response.ok:
+                    #save which schedule run when, to elasticsearch
+                    schedule_event = {
+                        "schedule_id": schedule_name,
+                        "created_on": datetime.now().isoformat(),
+                        "last_run": last_run
+                        }
+                    index_url_inner = f"{settings.ELASTIC_HOST}/schedules/_doc/{schedule_name}"
+                    response = requests.post(index_url_inner, headers=headers, json=schedule_event)
                 else:
-                    print("no hits found")
+                    print("failed to post the data to mitre_stix index,",response.content)
             else:
-                print("failed to retrieve any data:",response.json())
+                print("no hits found")
+        else:
+            print("failed to retrieve any data:",response.json())
 
 
 
@@ -154,8 +180,6 @@ def send_syslog_to_splunk():
     except Exception as ex:
         print("Exception occured!\n",ex)
 
-
-
 def getBatch(hits,should_parse):
     bulk = ""
     for hit in hits:
@@ -163,7 +187,6 @@ def getBatch(hits,should_parse):
         if should_parse:
             hit.update(parse_winlog(hit['_raw']))
         bulk += json.dumps({"index": {}}) + "\n" + json.dumps(hit) + "\n"
-   
     return bulk
 
 def parse_winlog(log_entry):
@@ -193,113 +216,167 @@ def parse_winlog(log_entry):
     return parsed_data
 
 
-
-def send_splunk_to_logstash(queries,es_index):
-    # username = settings.SPLUNK_USERNAME
-    # password = settings.SPLUNK_PASSWORD
+def create_payload(log, es_index, log_type):
+    payload = {
+        "index": es_index,
+        "log_type": log_type
+    }
+    
+    if '_raw' in log:
+        payload["raw_message"] = log['_raw']
+    
+    # Add fields dynamically if they are present in the log
+    optional_fields = ["user", "ComputerName", "Error_Code", "EventCode", "EventType", "Keywords",
+                       "LogName", "Message", "OpCode", "RecordNumber", "Sid", "SidType", "SourceName", 
+                       "TaskCategory", "Type"]
+    
+    for field in optional_fields:
+        if field in log:
+            # Dynamically set the payload field name to be snake_case, if needed
+            payload_key = field.lower()
+            payload[payload_key] = log[field]
+    
+    return payload
+    
+def send_splunk_to_logstash(queries, es_index):
+    username = "admin"
+    password = "admin123"
     logstash_url = settings.LOGSTASH_HOST
-    print("logstash host = {}".format(logstash_url))
-    username="admin"
-    password="admin123"
-    splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs'.format(username)
+
+    splunk_search_base_url = f'{settings.SPLUNK_HOST}/services/search/jobs'
     search_ids = []
     data = []
+
+    # Send search queries to Splunk
     for q in queries:
-        ID = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
-        search_ids.append(ID)
-        
-        # requests data from splunk of last 24 hours for query q
+
+        # Form data for POST request
         query = {
-            'id':ID,
-            'search': q.replace("\n",""),
-            'earliest_time': '-10m',
-            'latest_time': 'now'
+            'search': q,
+            'earliest_time': '-1m',
+            'latest_time': 'now',
+            'output_mode': 'json',
+            'adhoc_search_level': 'verbose' 
         }
+
+        # Sending request to create a search job
         resp = requests.post(splunk_search_base_url, data=query, verify=False, auth=(username, password))
         if not resp.ok:
-            print("fails",resp.content)
+            print("Failed to create search job:", resp.content)
             return
 
-    """ Polling for Job Completion"""
-    is_job_completed = ''
-    get_data = {
-        'output_mode': 'json',
-    }
-    while queries != []:
+        search_job_id = resp.json().get('sid')
+        if search_job_id:
+            search_ids.append(search_job_id)
+        else:
+            print("Failed to retrieve search job ID")
+            return
+        print(f"search job id ={search_job_id}")
+
+    """ Polling for Job Completion """
+    while queries:
         time.sleep(1)
-        splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}'.format(username, search_ids[-1])
-        resp_job_status = requests.post(splunk_search_base_url, data=get_data, verify=False, auth=(username, password))
-        resp_job_status_data=resp_job_status.json()
-        is_job_completed=resp_job_status_data['entry'][0]['content']['dispatchState']
-        if is_job_completed =="DONE":
+        splunk_search_status_url = f'{settings.SPLUNK_HOST}/services/search/jobs/{search_ids[-1]}'
+        resp_job_status = requests.get(splunk_search_status_url, params={'output_mode': 'json'}, verify=False, auth=(username, password))
+        if not resp_job_status.ok:
+            print("Failed to check job status:", resp_job_status.content)
+            return
+
+        is_job_completed = resp_job_status.json()['entry'][0]['content']['dispatchState']
+        if is_job_completed == "DONE":
             queries.pop()
-        
+
+    """ Fetching Search Results """
+    print(search_ids)
     offset = 0
-    page_size = 100        
+    page_size = 1000
     while search_ids:
+        splunk_search_results_url = f'{settings.SPLUNK_HOST}/services/search/jobs/{search_ids[-1]}/events'
         get_data = {
             'output_mode': 'json',
             'count': page_size,
             'offset': offset
         }
-        splunk_search_summary_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}/results'.format(username, search_ids[-1])
-        resp_job_status = requests.get(splunk_search_summary_url, params=get_data, verify=False, auth=(username, password))
-        resp_job_status_data=resp_job_status.json()
-        print(f"new records={len(resp_job_status_data['results'])}")
-        if not resp_job_status_data['results']:
+        # print(splunk_search_results_url)
+        # Fetching results
+        resp_job_status = requests.get(splunk_search_results_url, params=get_data, verify=False, auth=(username, password))
+        resp_job_status_data = resp_job_status.json()
+        if not resp_job_status_data.get('results'):
             search_ids.pop()
             offset = 0
             continue
-        data.extend(resp_job_status_data['results']) 
-        offset+=page_size
-    print("length of data = {}".format(len(data)))    
+
+        data.extend(resp_job_status_data['results'])
+        offset += page_size
+
+    print("Length of data = {}".format(len(data)))
+    session = requests.Session()
+    errors = []
     for log in data:
-        print(log)
-        if '_raw' in log:
-            payload = {
-            'index':es_index,
-            'message':log['_raw']
-            }
-            resp1= requests.post(logstash_url,data=json.dumps(payload))
-            if not resp1.ok:
-                print("NOT OKAY:",resp1.content)
-            else:
-                print(f"sent {log['_raw']}")
-
-
+        try:
+            if '_raw' in log and 'EventCode' in log:
+                payload = create_payload(log,es_index,"winlog")
+                # print(payload)
+                resp1 = session.post(logstash_url, data=json.dumps(payload))
+                if not resp1.ok:
+                    print("Failed to send data to Logstash:", resp1.content)
+                else:
+                    print(f"Sent data: {log['_raw']}")
+            elif '_raw' in log:
+                payload = {
+                    'index': es_index,
+                    'message': log['_raw'],
+                    'log_type':'syslog'
+                }
+                
+                resp1 = session.post(logstash_url, data=json.dumps(payload))
+                if not resp1.ok:
+                    print("Failed to send data to Logstash:", resp1.content)
+                else:
+                    print(f"Sent data: {log['_raw']}")
+        except Exception as e:
+            errors.append(e)        
+        session.close()
+    print("Errors(if any):",errors) 
 
 @shared_task
-def send_splunk_to_splunk_data():
+def splunk_to_splunk_data():
     print("""FETCHING DATA FROM SPLUNK AND PUSHING IT TO ELASTICSEARCH""")
-    send_splunk_to_logstash(['search index="linux_sys" sourcetype="syslog"'],"splunk_data")
+    queries = [
+        'search index="linux_sys"',
+        'search index="main"'
+        ]
+    # ['search index="linux_sys" sourcetype="syslog"']
+    send_splunk_to_logstash(queries,"splunk_data")
 
 @shared_task
 def send_splunk_to_pushed_offense():
+    
     print("""FETCHING OFFENSES FROM SPLUNK AND PUSHING IT TO ELASTICSEARCH""")
     username="admin"
     password="admin123"
+    print(f"splunk host:{settings.SPLUNK_HOST}")
     
-
     # fetches all user defined alerts from splunk
     alerts_req = requests.get(
-        url="https://192.168.1.38:8089/services/saved/searches?output_mode=json&search=is_scheduled=1",
+        url= f"{settings.SPLUNK_HOST}/services/saved/searches?output_mode=json&search=is_scheduled=1&search=disabled=false",
         verify=False,
         auth=(username,password)
     )
     if alerts_req.ok:
         alerts_res = alerts_req.json()
         entries = alerts_res['entry']
-        alerts = [entry['content']['qualifiedSearch'] for entry in entries]
-        send_splunk_to_logstash(alerts,"splunk_offenses")
+
+        # Filter searches that have 'eai:acl.app' equal to 'search'
+        filtered_alerts = [
+            entry['content']['qualifiedSearch'] for entry in entries 
+            if entry['acl']['app'] == 'search'
+        ]
+
+        # Output the number of matched searches and the filtered searches
+        send_splunk_to_logstash(filtered_alerts, "splunk_offenses")
     else:
-        print("ERROR: could not fetch alerts,",alerts_req.content)
-    
-    # alerts = [
-    # """search index="*" sourcetype="*" host="*" | search ("ransom" OR "encrypt" OR "decrypt" OR "payment" OR "bitcoin" OR [search index="linux_sys" sourcetype="syslog" host="ubuntu16" | stats count by dest_ip | where count > 100 | table dest_ip])""",
-    # """search index="*" sourcetype="*" host="*" | search process_name="*" | search (process_name="*.exe" OR process_name="*.dll" OR process_name="*.scr") | stats count by process_name, user | where count > 1 | sort - count""",
-    # """search index="*" sourcetype="syslog" (("sudo" OR "sudoers") OR ("su") OR ("passwd" OR "shadow") OR ("setuid" OR "setgid") OR ("exploit" OR "vulnerability" OR "rootkit" OR "CVE-")) host="ubuntu16" earliest=-24h""",
-    # """search index="linux_sys" sourcetype="syslog" ("Failed password" OR "authentication failure")""",
-    # ]
+        print("ERROR: Could not fetch alerts,", alerts_req.content)
 
 
 @shared_task
@@ -317,6 +394,7 @@ def run_single_active_query_task(schedule_name,index):
         
         data = response.json()
         query = data.get('_source', {}).get('query', 'Query not found').replace("\n","")
+        runQueries(index=index,queries=[query],schedule_name=schedule_name)
         
         # mappings_response = requests.get(f"{settings.ELASTIC_HOST}/ecs_mappings/_doc/2",headers=headers)
         # mappings = mappings_response.json()["_source"]
@@ -325,7 +403,6 @@ def run_single_active_query_task(schedule_name,index):
         # queries = buildQueries(query=query,mappings=mappings)
         # for now, we have two indices for testing, this code can later be changed 
         # runQueries(index="syslogs_index",queries=queries,schedule_name=schedule_name)
-        runQueries(index=index,queries=[query],schedule_name=schedule_name)
 
     except Exception as ex:
         print("error occurred",ex)
@@ -567,7 +644,7 @@ def send_splunk_to_pushed_offense():
 
 
 """
-    @shared_task
+@shared_task
 def send_splunk_to_elastic():
      # bulk = []
     print("sending data from splunk to elastic")
@@ -620,83 +697,3 @@ def send_splunk_to_elastic():
 
     
 
-# def send_splunk_to_elastic(queries,es_index):
-#     es_url = "http://192.168.1.103:9200/{}/_bulk"
-#     headers = {
-#         'Accept': 'application/json',
-#         'Content-Type': 'application/json',
-#         "Authorization": "ApiKey MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw=="
-#     }
-#     username="admin"
-#     password="admin123"
-#     splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs'.format(username)
-#     search_ids = []
-#     for i in range(len(queries)):
-#         ID = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
-#         search_ids.append(ID)
-#         query ={
-#             'id':ID,
-#             'search': queries[i],
-#             'earliest_time': '-24h',
-#             'latest_time': 'now'
-#         }
-
-#         # requests data from splunk of last 24 hours for alert i
-#         resp = requests.post(splunk_search_base_url, data=query, verify=False, auth=(username, password))
-#         if resp.ok:
-#             print("success")
-#         else:
-#             print("fails",resp.content)
-#             return
-#     is_job_completed=''
-#     # Polling for Job Completion
-#     data = []
-#     i=0
-#     offset = 0
-#     page_size = 100
-#     get_data = {
-#         'output_mode': 'json',
-#         'count': page_size,
-#         'offset': offset
-#     }
-#     while queries != []:
-#         time.sleep(1)
-#         splunk_search_base_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}'.format(username, search_ids[i])
-#         resp_job_status = requests.post(splunk_search_base_url, data=get_data, verify=False, auth=(username, password))
-#         resp_job_status_data=resp_job_status.json()
-#         is_job_completed=resp_job_status_data['entry'][0]['content']['dispatchState']
-#         if is_job_completed =="DONE":
-#             while True:
-#                 get_data = {
-#                     'output_mode': 'json',
-#                     'count': page_size,
-#                     'offset': offset
-#                 }
-#                 splunk_search_summary_url= 'https://192.168.1.38:8089/servicesNS/{}/search/search/jobs/{}/results'.format(username, search_ids[i])
-#                 resp_job_status = requests.get(splunk_search_summary_url, params=get_data, verify=False, auth=(username, password))
-#                 resp_job_status_data=resp_job_status.json()
-#                 if not resp_job_status_data['results']:
-#                     break
-#                 data.extend(resp_job_status_data['results']) 
-#                 offset+=page_size
-#             del search_ids[i]
-#             if search_ids == []:
-#                 break
-#             i%=len(search_ids)
-#         else:
-#             i = (i+1)%len(search_ids) 
-
-#     print("length of data={}".format(len(data)))    
-#     step=100
-#     j = 0
-#     return
-#     for i in range(0,len(data),step):
-#         j+=step
-#         # increasing step size that is the bulk size results in polynomial time of n2 for getBatch method,
-#         batch = getBatch(data[i:j],False)
-#         j+=step
-#         resp1 = requests.post(es_url.format(es_index), headers=headers, data=batch,verify=False)
-#         if  resp1.ok:
-#             print("okay status")
-#         else :
-#             print("NOT OKAY:",resp1.content)

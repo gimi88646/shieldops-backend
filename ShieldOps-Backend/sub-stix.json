@@ -1,0 +1,99 @@
+{
+	"type": "bundle",
+    "id": "bundle--b27f1eae-11c5-4446-bfdf-262c76d0d444",
+    "objects": [
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--258e0fd4-fd37-52c8-b208-780c0f05a22a",
+            "value": "DST IP: 192.168.1.47 - DST Port: "
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--5ede572d-0ca3-415f-be82-da365cd3413f",
+            "created": "2024-09-10T14:33:51.015178Z",
+            "modified": "2024-09-10T14:33:51.015178Z",
+            "relationship_type": "uses",
+            "source_ref": "threat-actor--d8ecadca-5630-408e-a0bf-a14c575b02e7",
+            "target_ref": "process--130eb629-2d0b-484d-9db1-20e927f9dec6"
+        },
+        {
+            "type": "process",
+            "spec_version": "2.1",
+            "id": "process--130eb629-2d0b-484d-9db1-20e927f9dec6",
+            "command_line": "sshd"
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "value": "SRC IP: 192.168.1.39 - SRC Port: ",
+            "defanged": true
+        },
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--d8ecadca-5630-408e-a0bf-a14c575b02e7",
+            "created": "2024-09-10T14:31:21.016629Z",
+            "modified": "2024-09-10T14:31:21.016629Z",
+            "name": "192.168.1.39",
+            "roles": [
+                "Hacker"
+            ],
+            "goals": [
+                "Scanning"
+            ]
+        },
+		  {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--5ede572d-0ca3-415f-be82-da365cd3413a",
+            "created": "2024-09-10T14:33:51.015178Z",
+            "modified": "2024-09-10T14:33:51.015178Z",
+            "relationship_type": "targets",
+            "source_ref": "threat-actor--d8ecadca-5630-408e-a0bf-a14c575b02e7",
+            "target_ref": "ipv4-addr--258e0fd4-fd37-52c8-b208-780c0f05a22a"
+        },
+        {
+            "type": "grouping",
+            "spec_version": "2.1",
+            "id": "grouping--bf531eda-c0fe-49eb-8f39-fd14d152c7e8",
+            "created": "2024-09-10T14:33:51.040404Z",
+            "modified": "2024-09-10T14:33:51.040404Z",
+            "name": "port scanning.",
+            "description": "Grouping....",
+            "context": "port scanning.",
+            "object_refs": [
+                "ipv4-addr--258e0fd4-fd37-52c8-b208-780c0f05a22a",
+                "relationship--5ede572d-0ca3-415f-be82-da365cd3413f",
+                "process--130eb629-2d0b-484d-9db1-20e927f9dec6",
+                "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+                "threat-actor--d8ecadca-5630-408e-a0bf-a14c575b02e7",
+                "attack-pattern--896d6110-b374-4cb9-8fc6-0a651873ed78",
+				"relationship--5ede572d-0ca3-415f-be82-da365cd3413a"
+            ]
+        }, 
+		{
+            "type": "attack-pattern",
+            "spec_version": "2.1",
+            "id": "attack-pattern--896d6110-b374-4cb9-8fc6-0a651873ed78",
+            "created": "2020-03-02T18:45:07.892Z",
+            "modified": "2020-10-18T01:55:03.337Z",
+            "name": "Port Scanning",
+            "description": "Monitors for a sequence of network activity on atypical ports, prior to receiving a single packet on such a non-standard\\r\\nport, which potentially indicates signal port knocking activity. Port knocking is a covert method of externally opening\\r\\nports by sending a sequence of packets to previously closed ports, which adversaries may leverage to discreetly gain\\r\\naccess without directly alerting traditional monitoring systems.\\r\\n",
+            "kill_chain_phases": [
+                {
+                    "kill_chain_name": "mitre-attack",
+                    "phase_name": "reconnaissance"
+                }
+            ],
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "external_id": "T1205"
+                }
+            ]
+        }
+	]
+}

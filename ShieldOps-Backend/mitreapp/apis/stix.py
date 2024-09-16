@@ -1,63 +1,70 @@
 
-def generate_stix(_form,to):
+import requests
+import stix2 as stix
+from django.http.response import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+from django.conf import settings
+from ..utils.gen_response import generate_response
 
-        headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            # "Authorization": "ApiKey {}".format(settings.ELASTIC_API_KEY)
-        }
-        search_body = {
-            "query": {
+# TODO: create a form for request body
+def generate_stix(request):
+    if request.method!="GET":
+        return generate_response(False,"failure",{"error":"Method not allowed"},405)
+    body = json.loads(request.body.decode('utf-8'))
+    to = body.get("to")
+    _from = body.get("from")
+    print("generating stix from ", _from, "to", to)
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        "Authorization": "ApiKey {}".format(settings.ELASTIC_API_KEY)
+    }
+    
+
+    search_body = {}
+    index_url_inner = f"{settings.ELASTIC_HOST}/mitre_stix/_search"
+    search_body = {
+        "query": {
                 "range": {
                     "created_on": {
-                        "gte": "now-30d/d",
-                        "lte": "now/d"
+                        "gte": _from,
+                        "lte": to
                     }
                 }
             },
             "sort":{
-                "created_on": "desc"
+                "events._source.@timestamp": "asc"
             }
         }
-        # index_url_inner = "{}/mitre_stix/_doc/{}".format(settings.ELASTIC_HOST,event_rule_id)
-        index_url_inner = "http://192.168.1.103:9200/mitre_stix/_search"
-        print(index_url_inner)
-        response = requests.post(index_url_inner,data=search_body, headers=headers)
-        if not response.ok:
-            return JsonResponse({'error': 'Failed to retrieve data from Elasticsearch'}, status=500)
-        stix = []
 
-        for hit in response.json()['hits']['hits']:
-            stix.append(hit['_source'])
-        
-        result = response.json()
+    detected_rules = requests.post(index_url_inner,json=search_body, headers=headers).json()
+    # hits->hits->source->rule_id
+    rules = {}
+    for source  in detected_rules['hits']['hits']:
+        rule_id = source['_source']['rule_id']
+        # find rule using rule id from elasticsearch mitre_rules index, for the rule id using http request
+        if rule_id not in rules:
+            rule = requests.get(f'http://192.168.1.103:9200/mitre_rules/_doc/{rule_id}').json()
+            rules[rule_id] =  rule['_source']
+    
+    attack_patterns_lists = {}
+    for rule_id,  rule in rules.items():
+        description = "some description."
+        threats = rule.get("threats", [])
+        attack_pattern_list = []
+        cyber_observables_ip_list = []
+        network_traffic_list = []
+        bundle = ""
 
-        
-        rule_id=result['_source']['rule_id']
-        
-        event = result['_source'].get('event', [])
-        
-        return
-        #Identify Mitre-Tactic
-        # get_rule_details = f"{settings.ELASTIC_HOST}/mitre_rules/_doc/{rule_id}"
-        get_rule_details = "http://192.168.1.103:9200/mitre_rules/_doc/"+rule_id
-
-        rule_details_response = requests.get(get_rule_details, headers=headers)
-        rule_response_json=rule_details_response.json()
-        description=rule_response_json["_source"]["description"]
-        threats=rule_response_json.get("_source", {}).get("threats", [])
-        
-        attack_pattern_list=[]
-        cyber_observables_ip_list=[]
-        network_traffic_list=[]
-        bundle=""
-        
         if(threats):
             for threat in threats:
-                tactic_name=threat["tactic"]["name"]
-                print(tactic_name)
-                tactic_technique=threat.get("techniques", [])
-                techinques_dict={}
+                tactic_name = threat["tactic"]["name"]
+                
+                
+                tactic_technique = threat.get("techniques", [])
+                
+                techinques_dict = {}
                 subtechniques_dict={}
                 if(tactic_technique):
                     for techniques in tactic_technique:
@@ -67,18 +74,17 @@ def generate_stix(_form,to):
                             for sub in sub_technique:
                                 subtechniques_dict[sub["id"]] = sub["name"]
                 
-                # attack pattern SDO's
                 # mitre techniques with threat actor
                 if techinques_dict:
                     first_key, first_value = next(iter(techinques_dict.items()))
 
-                attack_pattern = AttackPattern(
+                attack_pattern = stix.AttackPattern(
                     name= first_value,
                     type= "attack-pattern",
                     created= "2020-03-02T18:45:07.892Z",
                     revoked= False,
                     modified= "2020-10-18T01:55:03.337Z",
-                    description= description,
+                    description= description.replace("\r",""),
                     spec_version= "2.1",
                     kill_chain_phases = [
                         {
@@ -94,296 +100,211 @@ def generate_stix(_form,to):
                     ]
                 )
                 attack_pattern_list.append(attack_pattern)
+        attack_patterns_lists[rule_id] =  attack_pattern_list
 
-            for e in event:
+    detected_rules_sorted = [detected_rules['hits']['hits'][1],detected_rules['hits']['hits'][2],detected_rules['hits']['hits'][0]]
+    for rule in detected_rules_sorted:
+        print(rule['_source']['rule_id'])
+
+    objects = []
+    previous_group = None
+    for rule in detected_rules_sorted:
+        rule_id = rule['_source']['rule_id']
+        print(rule_id)
+        attack_patterns = attack_patterns_lists[rule_id]
+        
+        events = rule['_source']['events']
+        context=[] # resets when next rule is iterred
+        context.append(attack_patterns[0]["id"])
+        objects.append(attack_patterns[0])
+        
+        group_name=rules[rule_id]['threats'][0]['tactic']['name']
+        for e in events:
+            event = e['_source']
+
+            if e.get('_source',{}).get('event') and 'authentication' ==  e['_source']['event']['category'] and 'success' ==  e['_source']['event']['outcome']:
                 print(e)
-                raw_field= ""
-                if '_raw' in e['_source']:
-                    raw_field=(e["_source"]["_raw"])
-                if('SYN' in raw_field):
-                    values = re.findall(r'(\w+)=([^ =]+)', raw_field)
-                    json_data = {key: value for key, value in values}
+                src_ip=event["source.ip"]
+                dest_ip=event["host"]
+                dest_port=event["source.port"] if e.get("source.port") else event["destination.port"]
+                
+                
+                src_ipv4_object = stix.IPv4Address(
+                    value="SRC IP: "+src_ip+" - SRC Port: ",
+                    type= "ipv4-addr",
+                    defanged= True,
+                    spec_version= "2.1"
+                )
+                objects.append(src_ipv4_object)
+                context.append(src_ipv4_object)
+                
+                threat_actor = stix.ThreatActor(
+                    name="Attacker",
+                    goals=["Scanning"],
+                    roles=["Hacker"],
+                    spec_version="2.1"
+                )
+                context.append(threat_actor)
+                objects.append(threat_actor)
 
-                    raw_field=json_data
-                    src_ip=raw_field["SRC"]
-                    dest_ip=raw_field["DST"]
-                    src_port=raw_field["SPT"]
-                    dest_port=raw_field["DPT"]
-                    
-                    
-                    
-                    
-                    src_ipv4_object = IPv4Address(
-                        value="SRC IP: "+src_ip+" - SRC Port: "+src_port,
+                src_actor_rel = stix.Relationship(
+                    relationship_type="has",
+                    source_ref = threat_actor['id'],
+                    target_ref = src_ipv4_object['id']
+                )
+                context.append(src_actor_rel)
+                objects.append(src_actor_rel)
+            
+                dest_ipv4_object =  stix.IPv4Address(
+                    value="DEST IP: "+dest_ip+" - DEST Port: "+dest_port,
+                    type= "ipv4-addr",
+                    defanged= True,
+                    spec_version= "2.1"
+                )
+                objects.append(dest_ipv4_object)
+                context.append(dest_ipv4_object['id'])
+
+
+                
+                dest_attack_rel = stix.Relationship(
+                    relationship_type='targets',
+                    source_ref=threat_actor['id'],
+                    target_ref=dest_ipv4_object['id']
+                )
+
+                objects.append(dest_attack_rel)
+                context.append(dest_attack_rel['id'])
+                
+
+            elif e.get('_source',{}).get('event')  and   e['_source']['event']['category'] =='network' and e['_source']['event']['action'] =='connection_attempted' and e['_source']['event']['type']  == "start":
+        
+                """PORT SCANNING"""
+
+                if 'host' in e['_source']:
+                    host = e['_source']['host']
+                    # create an IPv4 Address object
+                    dest_ipv4_object = stix.IPv4Address(
+                        value="DST IP: "+host+" - DST Port: ",
                         type= "ipv4-addr",
-                        defanged= True,
-                        spec_version= "2.1"
                     )
-                    dest_ipv4_object =  IPv4Address(
-                        value="DEST IP: "+dest_ip+" - DEST Port: "+dest_port,
+                    objects.append(dest_ipv4_object)
+                    context.append(dest_ipv4_object)
+
+
+                # check if there exists source.ip field and create an IPv4 Address object, also create a threat actor for this
+                # print("'source.ip' in e['_source']", 'source.ip' in e['_source'])
+                # print(e)
+                if 'source.ip' in e['_source']:
+                
+                    src_ip = e['_source']['source.ip']
+                    # create an IPv4 Address object
+                    src_ipv4_object =  stix.IPv4Address(
+                        value="SRC IP: "+src_ip+" - SRC Port: ",
                         type= "ipv4-addr",
-                        defanged= True,
-                        spec_version= "2.1"
                     )
                     
-                    threat_actor = ThreatActor(
+
+                    
+                    threat_actor = stix.ThreatActor(
                         name=src_ip,
                         goals=["Scanning"],
                         roles=["Hacker"],
                         spec_version="2.1"
                     )
-                    network_traffic= NetworkTraffic(
-                        type= "network-traffic",
-                        spec_version= "2.1",
-                        src_ref = src_ipv4_object,
-                        dst_ref= dest_ipv4_object,
-                        src_port= src_port,
-                        dst_port= dest_port,
-                        protocols= [
-                            "tcp"
-                        ]
+                    objects.append(src_ipv4_object)
+                    context.append(src_ipv4_object)
+                    objects.append(threat_actor)
+                    context.append(threat_actor)
+                    # add relation  between threat actor and source IP of uses
+                    relationship = stix.Relationship(
+                        relationship_type='has',
+                        source_ref=threat_actor,
+                        target_ref=src_ipv4_object
+                        )
+                    objects.append(relationship)
+                    context.append(relationship)
+                    # add relation   between threat actor and destination IP of targets
+                    relationship = stix.Relationship(
+                        relationship_type='targets',
+                        source_ref=threat_actor,
+                        target_ref=dest_ipv4_object
                     )
-                    
-                    network_traffic_list.append(network_traffic)
-                    
-                    cyber_observables_ip_list.append(src_ipv4_object)
+                    objects.append(relationship)
+                    context.append(relationship)
 
-                    cyber_observables_ip_list.append(dest_ipv4_object)
-                    
-                    # print(cyber_observables_list)
+
+
+                # check if process.name  field exists, if it does, create a Process object, also add relationship SDO. threat actor uses process
+                if 'process.name' in e['_source']:
+                    process_name = e['_source']['process.name']
+                    process = stix.Process(
+                        command_line=process_name,
+                        spec_version="2.1",
+                    )
+                    actor_process_relation =  stix.Relationship(
+                        relationship_type='uses',
+                        source_ref=threat_actor,
+                        target_ref=process
+                    )
+
+                    objects.append(actor_process_relation)
+                    context.append(actor_process_relation)
+                    objects.append(process)
+                    context.append(process)
+
+
+            elif e['_source']['process.name'] == 'passwd':
+
+                # create threat actor and process object, also the relationship between them.
+                threat_actor = stix.ThreatActor(
+                    name="Attacker",
+                    goals=["priviledge escalation"],
+                    roles=["Hacker"],
+                    spec_version="2.1"
+                )
+                process = stix.Process(
+                    command_line="passwd",  #Command line for the process
+                    spec_version="2.1",
+                )
+                actor_proccess_relationship = stix.Relationship(
+                    source_ref=threat_actor['id'],
+                    target_ref=process['id'],
+                    relationship_type="enables"
+                )
+                context.append(threat_actor)
+                context.append(process)
+                context.append(actor_proccess_relationship)
+
+                objects.append(threat_actor)
+                objects.append(process)
+                objects.append(actor_proccess_relationship)
+
             
-                    if(cyber_observables_ip_list):
-                        relationship = Relationship(relationship_type='targets',
-                                                    source_ref=threat_actor,
-                                                    target_ref=cyber_observables_ip_list[1])
-                        
-                        # for nt in network_traffic_list:
-                        #     relationship_sync = Relationship(relationship_type='uses',
-                        #                                 source_ref=cyber_observables_ip_list[0],
-                        #                                 target_ref=nt)
-
-                        context_list=[src_ipv4_object, *network_traffic_list , dest_ipv4_object, threat_actor, relationship]
-                        for ap in attack_pattern_list:
-                            apjson=ap
-                            context_list.append(apjson["id"])
-                        grouping = Grouping(
-                            name=context_list,
-                            description="Grouping....",
-                            context=context_list,
-                            object_refs=context_list
-                        )
-
-                        bundle = Bundle(grouping, *attack_pattern_list, *cyber_observables_ip_list, *network_traffic_list, threat_actor , relationship)
-                        return JsonResponse(json.loads(bundle.serialize()), safe=False)
-
-                        
-                        # with open('test_stix.json','w') as file:
-                        #     file.write(bundle.serialize(pretty=True))
-                elif "Enumerate Credentials" in raw_field or  "Credential Enumeration" in raw_field or  "lsass.exe" in raw_field or  "mimikatz.exe" in raw_field:
-
-                        source = e["_source"]["Target.Server.Target.Server.Name"]
-                        dest = e["_source"]["Subject.Account.Domain"]
-
-                        src_ipv4_object = IPv4Address(
-                            value="Subject Account Domain: "+e["_source"]["Subject.Account.Domain"],
-                            type= "ipv4-addr",
-                            defanged= True,
-                            spec_version= "2.1"
-                        )
-                        dest_ipv4_object =  IPv4Address(
-                            value="Target.Server.Target.Server.Name: "+dest,
-                            type= "ipv4-addr",
-                            defanged= True,
-                            spec_version= "2.1"
-                        )                      
-                        threat_actor = ThreatActor(
-                            name=source,
-                            goals=["Ransome"],
-                            roles=["Hacker"],
-                            spec_version="2.1"
-                        )
-                        network_traffic= NetworkTraffic(
-                            type= "network-traffic",
-                            spec_version= "2.1",
-                            src_ref = src_ipv4_object,
-                            dst_ref= dest_ipv4_object,
-                            protocols= [
-                                "tcp"
-                            ]
-                        )
-                        network_traffic_list.append(network_traffic)
-                        cyber_observables_ip_list.append(src_ipv4_object)
-                        cyber_observables_ip_list.append(dest_ipv4_object)
-                        
-                        #print(cyber_observables_list)
                 
-                        if(cyber_observables_ip_list):
-                            relationship = Relationship(relationship_type='targets',
-                                                        source_ref=threat_actor,
-                                                        target_ref=cyber_observables_ip_list[1])
-                                                        
+        if context:
+            print("creating group")
+            group = stix.Grouping(
+                name=group_name,
+                description="Grouping....",
+                context=group_name,
+                object_refs=context
+            )
+            objects.append(group)
 
-                        context_list=[src_ipv4_object, *network_traffic_list , dest_ipv4_object, threat_actor, relationship]
-                        for ap in attack_pattern_list:
-                            context_list.append(ap["id"])
+            if previous_group:
+                group_relationship =stix.Relationship(
+                    source_ref=previous_group['id'],
+                    target_ref=group['id'],
+                    relationship_type="enables"
+                )
+                objects.append(group_relationship)
+                print('linking graph')
+            previous_group = group
+            objects.extend(attack_patterns_lists[rule_id])
+        else:
+            print("no context for rule id",rule_id)
+    bundle = stix.Bundle(*objects)
+    return generate_response (True,"success",json.loads(bundle.serialize()),200)
 
-                        grouping = Grouping(
-                            name=context_list,
-                            description="Grouping....",
-                            context=context_list,
-                            object_refs=context_list
-                        )
 
-                        bundle = Bundle(grouping, *attack_pattern_list, *cyber_observables_ip_list, *network_traffic_list, threat_actor , relationship)
-                        return JsonResponse(json.loads(bundle.serialize()), safe=False)
-                elif e['_source']['event']['type']=="authentication_failed":
-                    print("found auth fail")
-                    user = e['_source']['user']
-                    process_name = e['_source']['process']
-                    hostname = e['_source']['hostname']
-                    timestamp = e['_source']['@timestamp']
-                    source_ip = e['_source']['source_ip']
-                    destination_ip = e['_source']['host']
-                    destination_port = e['_source']['destination_port']
-                    process_id = e['_source']['pid']
-                    protocol = e['_source']['protocol']
-                    event_type = e['_source']['event']['type']
-                    
-                    src_ipv4_object = IPv4Address(
-                        value="SRC IP: "+source_ip,
-                        type= "ipv4-addr",
-                        defanged= True,
-                        spec_version= "2.1"
-                    )
-                    dest_ipv4_object =  IPv4Address(
-                        value="DEST IP: "+destination_ip+" - DEST Port: "+destination_port,
-                        type= "ipv4-addr",
-                        defanged= True,
-                        spec_version= "2.1"
-                    )
-                    
-                    threat_actor = ThreatActor(
-                        name=source_ip,
-                        goals=["Bruteforce"],
-                        roles=["Hacker"],
-                        spec_version="2.1"
-                    )
-                    network_traffic= NetworkTraffic(
-                        type= "network-traffic",
-                        spec_version= "2.1",
-                        src_ref = src_ipv4_object,
-                        dst_ref= dest_ipv4_object,
-                        src_port= 22,
-                        dst_port= destination_port,
-                        protocols= [
-                            protocol
-                        ]
-                    )
-                    user_account = UserAccount(
-                            user_id=user,
-                            account_type="unix"
-                    )
 
-                    process_file = File(
-                        name=process_name
-                    )
-
-                    process = Process(
-                        pid=process_id,
-                        image_ref=process_file.id
-                    )
-                    # source_address = IPv4Address(value=source_ip)
-                    # destination_address = IPv4Address(value=destination_ip)
-                    # network_traffic = NetworkTraffic(
-                    #     start=timestamp,
-                    #     end=timestamp,
-                    #     src_ref=source_address.id,
-                    #     dst_ref=destination_address.id,
-                    #     protocols=[protocol],
-                    #     src_port=22,
-                    #     dst_port=destination_port,
-                    #     is_active=False  # Ensure is_active is set to False when end is present
-                    # )
-
-                    observed_data = ObservedData(
-                        first_observed=timestamp,
-                        last_observed=timestamp,
-                        number_observed=1,
-                        objects={
-                            "0": user_account,
-                            "1": process,
-                            "2": network_traffic,
-                            "3": src_ipv4_object,
-                            "4": dest_ipv4_object,
-                            "5": process_file
-                        }
-                    )
-                    indicator = Indicator(
-                        indicator_types=["malicious-activity"],
-                        pattern=f"[network-traffic:src_ref.value = '{source_ip}' AND network-traffic:dst_ref.value = '{destination_ip}' AND process:pid = '{process_id}' AND user-account:user_id = '{user}' AND network-traffic:dst_port = {destination_port}]",
-                        pattern_type="stix",
-                        valid_from=timestamp
-                    )
-                    # Create relationships
-                    user_account_relationship = Relationship(
-                        relationship_type="belongs-to",
-                        source_ref=user_account.id,
-                        target_ref=process.id
-                    )
-                    
-                    network_traffic_list.append(network_traffic)
-                    
-                    cyber_observables_ip_list.append(src_ipv4_object)
-
-                    cyber_observables_ip_list.append(dest_ipv4_object)
-                    
-                    # print(cyber_observables_list)
-            
-                    # if(cyber_observables_ip_list):
-                    attacker_relationship = Relationship(relationship_type='targets',
-                                                source_ref=threat_actor,
-                                                target_ref=dest_ipv4_object)
-                    
-                    # for nt in network_traffic_list:
-                    #     relationship_sync = Relationship(relationship_type='uses',
-                    #                                 source_ref=cyber_observables_ip_list[0],
-                    #                                 target_ref=nt)
-
-                    context_list=[
-                        src_ipv4_object,
-                         *network_traffic_list ,
-                          dest_ipv4_object, 
-                          threat_actor, 
-                        #   user_account_relationship,
-                          attacker_relationship,
-                        # user_account,
-                        # process_file,
-                        # process
-                          ]
-                    for ap in attack_pattern_list:
-                        apjson=ap
-                        context_list.append(apjson["id"])
-                    grouping = Grouping(
-                        name=context_list,
-                        description="Grouping....",
-                        context=context_list,
-                        object_refs=context_list
-                    )
-                    bundle = Bundle(
-                        grouping,
-                        *attack_pattern_list, 
-                        *cyber_observables_ip_list, 
-                        *network_traffic_list, 
-                        threat_actor , 
-                        attacker_relationship,
-
-                        # user_account,
-                        # process_file,
-                        # process, 
-                        # user_account_relationship,
-                        # indicator,
-                        # observed_data
-                        )
-                    return JsonResponse(json.loads(bundle.serialize()), safe=False)
-
-  

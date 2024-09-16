@@ -10,7 +10,7 @@ from django.conf import settings
 import json
 import requests
 import re
-from stix2 import Sighting, File, Indicator, Malware, Relationship, Bundle, AttackPattern, Grouping, IPv4Address , MACAddress, NetworkTraffic, ThreatActor, ObservedData, UserAccount, Process
+from stix2 import Sighting, File, Indicator,Process, Malware, Relationship, Bundle, AttackPattern, Grouping, IPv4Address , MACAddress, NetworkTraffic, ThreatActor, ObservedData, UserAccount, Process
     
 def extract_interval(interval_query):
     pattern = r'(\d+)([smh])'
@@ -59,9 +59,6 @@ def run_single_task(request):
         return JsonResponse({'message': f"Celery Beat task with ID '{task_id}' started successfully."})
     else:
         return JsonResponse("Method not allowed", status=405)
-
-
-
 
 @csrf_exempt
 def get_all_periodic_tasks(request):
@@ -1005,7 +1002,7 @@ def get_all_splunk_events(request):
         'Content-Type': 'application/json',
         "Authorization": "ApiKey MEtuVHVZOEJVekQ0RGFmaFJzcWI6dVhNUXZmTkRRUXlVclNuS2pqMzREdw=="
     }
-    index_url_inner = f"http://192.168.1.103:9200/parsed_splunk_data_logstash/_search?scroll=1m"
+    index_url_inner = f"http://192.168.1.103:9200/splunk_data/_search?scroll=1m&sort=@timestamp:desc"
 
     initial_search_body = {
         'size': 1000,
@@ -1065,7 +1062,6 @@ def get_all_splunk_events(request):
     resp_body["data"]=[ entry['_source'] for entry in all_documents]
 
     return JsonResponse(resp_body, safe=False,status=200)
-    # return JsonResponse(data=json.dumps(all_documents),safe=False)
 
 
 @csrf_exempt

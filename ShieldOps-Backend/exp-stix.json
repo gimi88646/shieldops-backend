@@ -1,0 +1,317 @@
+{
+    "type": "bundle",
+    "id": "bundle--b27f1eae-11c5-4446-bfdf-262c76d0d444",
+    "objects": [
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--258e0fd4-fd37-52c8-b208-780c0f05a22a",
+            "value": "DST IP: 192.168.1.47 - DST Port: "
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--5ede572d-0ca3-415f-be82-da365cd3413f",
+            "created": "2024-09-10T14:33:51.015178Z",
+            "modified": "2024-09-10T14:33:51.015178Z",
+            "relationship_type": "uses",
+            "source_ref": "threat-actor--d8ecadca-5630-408e-a0bf-a14c575b02e7",
+            "target_ref": "process--130eb629-2d0b-484d-9db1-20e927f9dec6"
+        },
+        {
+            "type": "process",
+            "spec_version": "2.1",
+            "id": "process--130eb629-2d0b-484d-9db1-20e927f9dec6",
+            "command_line": "sshd"
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "value": "SRC IP: 192.168.1.39 - SRC Port: ",
+            "defanged": true
+        },
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--d8ecadca-5630-408e-a0bf-a14c575b02e7",
+            "created": "2024-09-10T14:31:21.016629Z",
+            "modified": "2024-09-10T14:31:21.016629Z",
+            "name": "192.168.1.39",
+            "roles": [
+                "Hacker"
+            ],
+            "goals": [
+                "Scanning"
+            ]
+        },
+        {
+            "type": "grouping",
+            "spec_version": "2.1",
+            "id": "grouping--bf531eda-c0fe-49eb-8f39-fd14d152c7e8",
+            "created": "2024-09-10T14:33:51.040404Z",
+            "modified": "2024-09-10T14:33:51.040404Z",
+            "name": "port scanning.",
+            "description": "Grouping....",
+            "context": "port scanning.",
+            "object_refs": [
+                "ipv4-addr--258e0fd4-fd37-52c8-b208-780c0f05a22a",
+                "relationship--5ede572d-0ca3-415f-be82-da365cd3413f",
+                "process--130eb629-2d0b-484d-9db1-20e927f9dec6",
+                "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+                "threat-actor--d8ecadca-5630-408e-a0bf-a14c575b02e7",
+                "attack-pattern--896d6110-b374-4cb9-8fc6-0a651873ed78",
+                "attack-pattern--5f013a6a-c3b6-40c2-a071-9e5d78a41cab"
+            ]
+        },
+        {
+            "type": "attack-pattern",
+            "spec_version": "2.1",
+            "id": "attack-pattern--896d6110-b374-4cb9-8fc6-0a651873ed78",
+            "created": "2020-03-02T18:45:07.892Z",
+            "modified": "2020-10-18T01:55:03.337Z",
+            "name": "Traffic Signaling",
+            "description": "Monitors for a sequence of network activity on atypical ports, prior to receiving a single packet on such a non-standard\\r\\nport, which potentially indicates signal port knocking activity. Port knocking is a covert method of externally opening\\r\\nports by sending a sequence of packets to previously closed ports, which adversaries may leverage to discreetly gain\\r\\naccess without directly alerting traditional monitoring systems.\\r\\n",
+            "kill_chain_phases": [
+                {
+                    "kill_chain_name": "mitre-attack",
+                    "phase_name": "Command and Control"
+                }
+            ],
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "external_id": "T1205"
+                }
+            ]
+        },
+        {
+            "type": "attack-pattern",
+            "spec_version": "2.1",
+            "id": "attack-pattern--5f013a6a-c3b6-40c2-a071-9e5d78a41cab",
+            "created": "2020-03-02T18:45:07.892Z",
+            "modified": "2020-10-18T01:55:03.337Z",
+            "name": "Traffic Signaling",
+            "description": "Monitors for a sequence of network activity on atypical ports, prior to receiving a single packet on such a non-standard\\r\\nport, which potentially indicates signal port knocking activity. Port knocking is a covert method of externally opening\\r\\nports by sending a sequence of packets to previously closed ports, which adversaries may leverage to discreetly gain\\r\\naccess without directly alerting traditional monitoring systems.\\r\\n",
+            "kill_chain_phases": [
+                {
+                    "kill_chain_name": "mitre-attack",
+                    "phase_name": "Defense Evasion"
+                }
+            ],
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "external_id": "T1205"
+                }
+            ]
+        },
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--2863dc2e-e30e-4451-be7c-db3d17f93eaa",
+            "created": "2024-09-10T14:33:51.056032Z",
+            "modified": "2024-09-10T14:33:51.056032Z",
+            "name": "Attacker",
+            "roles": [
+                "Hacker"
+            ],
+            "goals": [
+                "priviledge escalation"
+            ]
+        },
+        {
+            "type": "process",
+            "spec_version": "2.1",
+            "id": "process--a735fbd1-3529-4bf9-aa8c-b6eea72c83be",
+            "command_line": "passwd"
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--12e3379f-6279-4749-adb5-82bf2f51d9a3",
+            "created": "2024-09-10T14:33:51.056032Z",
+            "modified": "2024-09-10T14:33:51.056032Z",
+            "relationship_type": "enables",
+            "source_ref": "threat-actor--2863dc2e-e30e-4451-be7c-db3d17f93eaa",
+            "target_ref": "process--a735fbd1-3529-4bf9-aa8c-b6eea72c83be"
+        },
+        {
+            "type": "grouping",
+            "spec_version": "2.1",
+            "id": "grouping--a7c28090-0b89-4601-8f8e-3e5e0a0a5a87",
+            "created": "2024-09-10T14:33:51.056032Z",
+            "modified": "2024-09-10T14:33:51.056032Z",
+            "name": "priviledge escalation",
+            "description": "Grouping....",
+            "context": "priviledge escalation",
+            "object_refs": [
+                "threat-actor--2863dc2e-e30e-4451-be7c-db3d17f93eaa",
+                "process--a735fbd1-3529-4bf9-aa8c-b6eea72c83be",
+                "relationship--12e3379f-6279-4749-adb5-82bf2f51d9a3",
+                "attack-pattern--6afd2a88-04f6-46d4-9b9f-42733e3cf61f"
+            ]
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--fef1b131-f83e-4bfe-a05f-545c6c2426c7",
+            "created": "2024-09-10T14:33:51.071655Z",
+            "modified": "2024-09-10T14:33:51.071655Z",
+            "relationship_type": "enables",
+            "source_ref": "grouping--bf531eda-c0fe-49eb-8f39-fd14d152c7e8",
+            "target_ref": "grouping--a7c28090-0b89-4601-8f8e-3e5e0a0a5a87"
+        },
+        {
+            "type": "attack-pattern",
+            "spec_version": "2.1",
+            "id": "attack-pattern--6afd2a88-04f6-46d4-9b9f-42733e3cf61f",
+            "created": "2020-03-02T18:45:07.892Z",
+            "modified": "2020-10-18T01:55:03.337Z",
+            "name": "Exploitation for Privilege Escalation",
+            "description": "this is desc",
+            "kill_chain_phases": [
+                {
+                    "kill_chain_name": "mitre-attack",
+                    "phase_name": "Privilege Escalation"
+                }
+            ],
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "external_id": "T1068"
+                }
+            ]
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "value": "SRC IP: 192.168.1.39 - SRC Port: ",
+            "defanged": true
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--a3c2a106-1901-5bd1-8355-2dc962c41804",
+            "value": "DEST IP: 192.168.1.30 - DEST Port: 37850",
+            "defanged": true
+        },
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--2f7862b0-5dab-4f8b-b98f-8e21fcba60e8",
+            "created": "2024-09-10T14:33:51.071655Z",
+            "modified": "2024-09-10T14:33:51.071655Z",
+            "name": "192.168.1.39",
+            "roles": [
+                "Hacker"
+            ],
+            "goals": [
+                "Scanning"
+            ]
+        },
+        
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--5a9fed5c-3fd9-4951-9b90-ff25666143a6",
+            "created": "2024-09-10T14:33:51.071655Z",
+            "modified": "2024-09-10T14:33:51.071655Z",
+            "relationship_type": "targets",
+            "source_ref": "threat-actor--2f7862b0-5dab-4f8b-b98f-8e21fcba60e8",
+            "target_ref": "ipv4-addr--a3c2a106-1901-5bd1-8355-2dc962c41804"
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+            "value": "SRC IP: 192.168.1.39 - SRC Port: ",
+            "defanged": true
+        },
+        {
+            "type": "ipv4-addr",
+            "spec_version": "2.1",
+            "id": "ipv4-addr--4ad32c66-abd3-5116-8d9e-4de62bedf8ff",
+            "value": "DEST IP: 192.168.1.30 - DEST Port: 43622",
+            "defanged": true
+        },
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--0618cd27-6e64-4daf-9348-d5215427b769",
+            "created": "2024-09-10T14:33:51.097694Z",
+            "modified": "2024-09-10T14:33:51.097694Z",
+            "name": "192.168.1.39",
+            "roles": [
+                "Hacker"
+            ],
+            "goals": [
+                "Scanning"
+            ]
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--97c559ff-c0a7-4178-b951-0d60f39f5cc3",
+            "created": "2024-09-10T14:33:51.097694Z",
+            "modified": "2024-09-10T14:33:51.097694Z",
+            "relationship_type": "targets",
+            "source_ref": "threat-actor--0618cd27-6e64-4daf-9348-d5215427b769",
+            "target_ref": "ipv4-addr--4ad32c66-abd3-5116-8d9e-4de62bedf8ff"
+        },
+        {
+            "type": "grouping",
+            "spec_version": "2.1",
+            "id": "grouping--974cd7cb-bde6-4983-954a-6a0f4bd3a89f",
+            "created": "2024-09-10T14:33:51.113337Z",
+            "modified": "2024-09-10T14:33:51.113337Z",
+            "name": "bruteforce",
+            "description": "Grouping....",
+            "context": "bruteforce",
+            "object_refs": [
+                "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+                "ipv4-addr--a3c2a106-1901-5bd1-8355-2dc962c41804",
+                "threat-actor--2f7862b0-5dab-4f8b-b98f-8e21fcba60e8",
+                "relationship--5a9fed5c-3fd9-4951-9b90-ff25666143a6",
+                "attack-pattern--a75fc2eb-5f38-495d-925c-8f518aa04af8",
+                "ipv4-addr--38fcae08-6038-53d0-ab7b-8a6e58e277e7",
+                "ipv4-addr--4ad32c66-abd3-5116-8d9e-4de62bedf8ff",
+                "threat-actor--0618cd27-6e64-4daf-9348-d5215427b769",
+                "relationship--97c559ff-c0a7-4178-b951-0d60f39f5cc3",
+                "attack-pattern--a75fc2eb-5f38-495d-925c-8f518aa04af8"
+            ]
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--02f4464d-edff-4eb1-8220-116ea27fd982",
+            "created": "2024-09-10T14:33:51.114343Z",
+            "modified": "2024-09-10T14:33:51.114343Z",
+            "relationship_type": "enables",
+            "source_ref": "grouping--a7c28090-0b89-4601-8f8e-3e5e0a0a5a87",
+            "target_ref": "grouping--974cd7cb-bde6-4983-954a-6a0f4bd3a89f"
+        },
+        {
+            "type": "attack-pattern",
+            "spec_version": "2.1",
+            "id": "attack-pattern--a75fc2eb-5f38-495d-925c-8f518aa04af8",
+            "created": "2020-03-02T18:45:07.892Z",
+            "modified": "2020-10-18T01:55:03.337Z",
+            "name": "Brute Force",
+            "description": "Identifies multiple external consecutive login failures targeting a user account from the same source address within\\r\\na short time interval. Adversaries will often brute force login attempts across multiple users with a common or known\\r\\npassword, in an attempt to gain access to these accounts.\\r\\n",
+            "kill_chain_phases": [
+                {
+                    "kill_chain_name": "mitre-attack",
+                    "phase_name": "Credential Access"
+                }
+            ],
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "external_id": "T1110"
+                }
+            ]
+        }
+    ]
+}
