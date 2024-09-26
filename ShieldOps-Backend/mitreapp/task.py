@@ -216,10 +216,13 @@ def parse_winlog(log_entry):
     return parsed_data
 
 
-def create_payload(log, es_index, log_type):
+def create_payload(log, es_index, sourcetype):
+    if LogName in log:
+        sourcetype2 = sourcetype+Logname
     payload = {
         "index": es_index,
-        "log_type": log_type
+        "sourcetype": sourcetype2,
+        "log_type": sourcetype
     }
     
     if '_raw' in log:
@@ -237,7 +240,7 @@ def create_payload(log, es_index, log_type):
             payload[payload_key] = log[field]
     
     return payload
-    
+
 def send_splunk_to_logstash(queries, es_index):
     username = "admin"
     password = "admin123"
@@ -249,6 +252,8 @@ def send_splunk_to_logstash(queries, es_index):
 
     # Send search queries to Splunk
     for q in queries:
+        # ID = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
+        # search_ids.append(ID)
 
         # Form data for POST request
         query = {
@@ -256,7 +261,7 @@ def send_splunk_to_logstash(queries, es_index):
             'earliest_time': '-1m',
             'latest_time': 'now',
             'output_mode': 'json',
-            'adhoc_search_level': 'verbose' 
+            'adhoc_search_level': 'verbose'  # Setting verbose mode
         }
 
         # Sending request to create a search job
@@ -265,24 +270,26 @@ def send_splunk_to_logstash(queries, es_index):
             print("Failed to create search job:", resp.content)
             return
 
+        # Extract the search job ID
         search_job_id = resp.json().get('sid')
         if search_job_id:
             search_ids.append(search_job_id)
         else:
             print("Failed to retrieve search job ID")
             return
-        print(f"search job id ={search_job_id}")
+        # print(search_job_id)
 
     """ Polling for Job Completion """
     while queries:
         time.sleep(1)
-        splunk_search_status_url = f'{settings.SPLUNK_HOST}/services/search/jobs/{search_ids[-1]}'
+        splunk_search_status_url = f'https://192.168.1.38:8089/services/search/jobs/{search_ids[-1]}'
         resp_job_status = requests.get(splunk_search_status_url, params={'output_mode': 'json'}, verify=False, auth=(username, password))
         if not resp_job_status.ok:
             print("Failed to check job status:", resp_job_status.content)
             return
 
         is_job_completed = resp_job_status.json()['entry'][0]['content']['dispatchState']
+        # print(is_job_completed)
         if is_job_completed == "DONE":
             queries.pop()
 
@@ -311,11 +318,12 @@ def send_splunk_to_logstash(queries, es_index):
 
     print("Length of data = {}".format(len(data)))
     session = requests.Session()
+    # Sending data to Logstash
     errors = []
     for log in data:
         try:
             if '_raw' in log and 'EventCode' in log:
-                payload = create_payload(log,es_index,"winlog")
+                payload = create_payload(log,es_index,"WinEventLog")
                 # print(payload)
                 resp1 = session.post(logstash_url, data=json.dumps(payload))
                 if not resp1.ok:

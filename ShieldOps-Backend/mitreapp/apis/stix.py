@@ -8,9 +8,11 @@ from django.conf import settings
 from ..utils.gen_response import generate_response
 
 # TODO: create a form for request body
+@csrf_exempt
 def generate_stix(request):
-    if request.method!="GET":
+    if request.method!="GET" and request.method!="POST":
         return generate_response(False,"failure",{"error":"Method not allowed"},405)
+    
     body = json.loads(request.body.decode('utf-8'))
     to = body.get("to")
     _from = body.get("from")
